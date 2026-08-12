@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using Rovia.Backends.SingBox;
 using Rovia.Config.Parsing;
 using Rovia.Config.Storage;
@@ -39,7 +40,7 @@ internal static class RoviaCli
                 _              => Unknown(args[0])
             };
         }
-        catch (Exception exception) when (exception is ProxyLinkParseException or InvalidOperationException or IOException)
+        catch (Exception exception) when (exception is ProxyLinkParseException or InvalidOperationException or IOException or Win32Exception)
         {
             Console.Error.WriteLine($"error: {exception.Message}");
             return 2;
