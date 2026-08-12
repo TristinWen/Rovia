@@ -7,4 +7,6 @@ public sealed record SingBoxOptions
     public string WorkingDirectory { get; init; } = Path.Combine(Path.GetTempPath(), "rovia");
     public string ListenAddress { get; init; } = "127.0.0.1";
     public int ListenPort { get; init; } = 2080;
+    public SingBoxConnectionMode Mode { get; init; } = SingBoxConnectionMode.SystemProxy;
+    public string TunStack { get; init; } = "mixed";
 }

@@ -75,6 +75,10 @@ the exact previous system proxy configuration is then restored.
 Set `ROVIA_SING_BOX` to a custom executable path, `ROVIA_LISTEN_PORT` to change
 the endpoint, or `ROVIA_DATA_DIR` to relocate local state.
 
+Set `ROVIA_MODE=tun` before connecting to enable transparent TUN capture. TUN
+normally requires an elevated Windows process and does not modify the Windows
+HTTP proxy. The default `system-proxy` mode remains safer for ordinary browsing.
+
 `speed-test` warms the proxy connection, reports the median of three application
 latency samples, and streams at most 5 MB to estimate download throughput. It is
 manual by design so periodic route monitoring does not consume significant data.

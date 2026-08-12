@@ -147,8 +147,9 @@ internal static class RoviaCli
         Task serverTask             = server.RunAsync(exit.Token);
         AdaptiveRouteMonitor monitor = new(engine, new RouteHistoryStore(historyPath), TimeSpan.FromSeconds(30));
         Task monitorTask             = automatic ? monitor.RunAsync(exit.Token) : Task.CompletedTask;
-        IDisposable? proxyLease      = OperatingSystem.IsWindows()
-            ? SystemProxyLease.Activate(new WindowsSystemProxySettings(), snapshotPath, $"127.0.0.1:{CreateOptions(dataDirectory).ListenPort}")
+        SingBoxOptions activeOptions = CreateOptions(dataDirectory, singBoxPath);
+        IDisposable? proxyLease      = OperatingSystem.IsWindows() && activeOptions.Mode == SingBoxConnectionMode.SystemProxy
+            ? SystemProxyLease.Activate(new WindowsSystemProxySettings(), snapshotPath, $"127.0.0.1:{activeOptions.ListenPort}")
             : null;
         Console.WriteLine($"connected {DisplayName(node)} via {status.LocalEndpoint}; egress verified");
         Console.WriteLine("Use 'rovia disconnect' or press Ctrl+C to disconnect.");
@@ -220,7 +221,9 @@ internal static class RoviaCli
     {
         ExecutablePath  = singBoxPath ?? Environment.GetEnvironmentVariable("ROVIA_SING_BOX") ?? "sing-box",
         WorkingDirectory = Path.Combine(dataDirectory, "runtime"),
-        ListenPort       = int.TryParse(Environment.GetEnvironmentVariable("ROVIA_LISTEN_PORT"), out int port) ? port : 2080
+        ListenPort       = int.TryParse(Environment.GetEnvironmentVariable("ROVIA_LISTEN_PORT"), out int port) ? port : 2080,
+        Mode             = Environment.GetEnvironmentVariable("ROVIA_MODE")?.Equals("tun", StringComparison.OrdinalIgnoreCase) == true
+            ? SingBoxConnectionMode.Tun : SingBoxConnectionMode.SystemProxy
     };
 
     private static string DisplayName(ProxyNode node) => string.IsNullOrWhiteSpace(node.Name) ? node.Host : node.Name;

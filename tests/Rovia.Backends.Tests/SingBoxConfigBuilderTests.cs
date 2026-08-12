@@ -26,4 +26,13 @@ public sealed class SingBoxConfigBuilderTests
         Assert.Equal("vless", document.RootElement.GetProperty("outbounds")[0].GetProperty("type").GetString());
         Assert.Equal("public-key", document.RootElement.GetProperty("outbounds")[0].GetProperty("tls").GetProperty("reality").GetProperty("public_key").GetString());
     }
+
+    [Fact]
+    public void Build_AddsTunInboundOnlyWhenRequested()
+    {
+        ProxyNode node = new() { Protocol = ProxyProtocol.Vless, Host = "example.com", Port = 443, Credentials = new("11111111-1111-1111-1111-111111111111") };
+        string json = new SingBoxConfigBuilder().Build(node, new SingBoxOptions { Mode = SingBoxConnectionMode.Tun });
+        using JsonDocument document = JsonDocument.Parse(json);
+        Assert.Contains(document.RootElement.GetProperty("inbounds").EnumerateArray(), inbound => inbound.GetProperty("type").GetString() == "tun");
+    }
 }

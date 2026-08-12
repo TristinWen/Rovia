@@ -28,18 +28,31 @@ public sealed class SingBoxConfigBuilder
         JsonObject root = new()
         {
             ["log"] = new JsonObject { ["level"] = "info", ["timestamp"] = true },
-            ["inbounds"] = new JsonArray
-            {
-                new JsonObject
-                {
-                    ["type"] = "mixed", ["tag"] = "mixed-in", ["listen"] = options.ListenAddress,
-                    ["listen_port"] = options.ListenPort
-                }
-            },
+            ["inbounds"] = BuildInbounds(options),
             ["outbounds"] = new JsonArray { outbound, new JsonObject { ["type"] = "direct", ["tag"] = "direct" } },
             ["route"] = new JsonObject { ["final"] = "proxy" }
         };
         return root.ToJsonString(JsonOptions);
+    }
+
+    private static JsonArray BuildInbounds(SingBoxOptions options)
+    {
+        JsonArray inbounds = new()
+        {
+            new JsonObject
+            {
+                ["type"] = "mixed", ["tag"] = "mixed-in", ["listen"] = options.ListenAddress,
+                ["listen_port"] = options.ListenPort
+            }
+        };
+        if (options.Mode == SingBoxConnectionMode.Tun)
+            inbounds.Add(new JsonObject
+            {
+                ["type"] = "tun", ["tag"] = "tun-in", ["interface_name"] = "Rovia",
+                ["address"] = new JsonArray("172.19.0.1/30"), ["mtu"] = 9000, ["auto_route"] = true,
+                ["strict_route"] = true, ["stack"] = options.TunStack
+            });
+        return inbounds;
     }
 
     private static JsonObject BuildUuidOutbound(string type, ProxyNode node) => new()
