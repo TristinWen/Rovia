@@ -4,6 +4,9 @@ Rovia is a reusable intelligent proxy routing engine that monitors, scores,
 selects, and fails over between proxy routes while delegating protocol transport
 to existing backends such as sing-box.
 
+See [ROADMAP.md](ROADMAP.md) for architecture constraints, current limitations,
+new-machine setup, prioritized milestones, and handoff requirements.
+
 ## Architecture
 
 ```text
