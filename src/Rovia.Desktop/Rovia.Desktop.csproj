@@ -34,4 +34,10 @@
     </ItemGroup>
     <Copy SourceFiles="@(CliRuntimeFile)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
   </Target>
+
+  <Target Name="PublishCliRuntime" AfterTargets="Publish">
+    <MSBuild Projects="..\Rovia.Cli\Rovia.Cli.csproj"
+             Targets="Publish"
+             Properties="Configuration=$(Configuration);TargetFramework=$(TargetFramework);RuntimeIdentifier=$(RuntimeIdentifier);SelfContained=$(SelfContained);PublishDir=$(PublishDir)runtime\" />
+  </Target>
 </Project>

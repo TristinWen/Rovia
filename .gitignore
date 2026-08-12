@@ -7,3 +7,4 @@
 *.suo
 TestResults/
 coverage/
+publish/

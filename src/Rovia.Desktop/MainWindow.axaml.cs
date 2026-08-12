@@ -204,6 +204,9 @@ public partial class MainWindow : Window
 
     private static string FindCliPath()
     {
+        string published = Path.Combine(AppContext.BaseDirectory, "runtime", "rovia.exe");
+        if (File.Exists(published))
+            return published;
         string sibling = Path.Combine(AppContext.BaseDirectory, "rovia.exe");
         if (File.Exists(sibling))
             return sibling;
