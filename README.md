@@ -38,6 +38,9 @@ The dependency direction is intentionally constrained:
 - Deterministic stability-first scoring, hysteresis, and emergency failover.
 - Deterministic sing-box configuration and managed process lifecycle.
 - A CLI for importing, inspecting, probing, ranking, and connecting nodes.
+- A controllable runtime host with automatic monitoring and route history.
+- Safe Windows system proxy activation with previous-setting restoration.
+- A simple Avalonia desktop control panel shared with the same Core and runtime.
 
 ## Build and test
 
@@ -60,19 +63,36 @@ rovia rank
 rovia check-config <node-id>
 rovia connect <node-id>
 rovia connect-auto
+rovia status
+rovia disconnect
 ```
 
-`connect` runs as the foreground owner of sing-box and exposes a mixed HTTP/SOCKS
-proxy at `127.0.0.1:2080` by default. Press Ctrl+C for an orderly disconnect.
+`connect` runs as the owner of sing-box and exposes a mixed HTTP/SOCKS proxy at
+`127.0.0.1:2080` by default. It verifies real HTTP egress before changing the
+Windows system proxy. Use `disconnect` or press Ctrl+C for an orderly shutdown;
+the exact previous system proxy configuration is then restored.
 Set `ROVIA_SING_BOX` to a custom executable path, `ROVIA_LISTEN_PORT` to change
 the endpoint, or `ROVIA_DATA_DIR` to relocate local state.
 
+## Desktop
+
+Build and launch the lightweight desktop shell after building the solution:
+
+```text
+dotnet run --project src/Rovia.Desktop --configuration Release
+```
+
+The desktop application can import VLESS links, display persisted nodes, start
+automatic routing, inspect runtime status, and disconnect. It delegates parsing
+and state to the existing libraries and controls the same runtime host as the CLI.
+
 ## Current status
 
-Rovia is a functional Core and CLI prototype. VLESS through sing-box is the only
+Rovia is a functional Core, runtime, CLI, and Desktop prototype. VLESS through sing-box is the only
 implemented protocol/backend combination. Health checks currently measure TCP
-reachability rather than end-to-end proxy throughput, and automatic background
-monitoring is not yet hosted as a long-running service.
+reachability for ranking, while connection activation separately verifies HTTP
+egress. The runtime monitors routes every 30 seconds and applies policy-controlled
+switching; it is not yet installed as an operating-system service.
 
 Credentials are stored in the local node file because sing-box requires them, but
 Rovia never includes them in node display strings, normal CLI output, or scoring
