@@ -16,12 +16,12 @@ public sealed class RuntimeControlServer(string pipeName, Func<RuntimeState> sta
             using StreamReader reader = new(pipe, leaveOpen: true);
             await using StreamWriter writer = new(pipe, leaveOpen: true) { AutoFlush = true };
             string command = (await reader.ReadLineAsync(cancellationToken) ?? string.Empty).Trim().ToLowerInvariant();
-            if (command == "disconnect")
-                stopRequested();
             RuntimeState state = command is "status" or "disconnect"
                 ? stateProvider()
                 : stateProvider() with { LastMessage = $"Unknown runtime command '{command}'." };
             await writer.WriteLineAsync(JsonSerializer.Serialize(state).AsMemory(), cancellationToken);
+            if (command == "disconnect")
+                stopRequested();
         }
     }
 }

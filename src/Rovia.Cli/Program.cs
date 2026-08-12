@@ -8,6 +8,9 @@ using Rovia.Core.Health;
 using Rovia.Core.Models;
 using Rovia.Core.Policies;
 using Rovia.Core.Routing;
+using Rovia.Platform.Windows.Proxy;
+using Rovia.Runtime.Monitoring;
+using Rovia.Runtime.Runtime;
 
 return await RoviaCli.RunAsync(args);
 
@@ -36,6 +39,8 @@ internal static class RoviaCli
                 "rank"         => await RankAsync(repository),
                 "connect"      => await ConnectAsync(args, repository, dataDirectory, false),
                 "connect-auto" => await ConnectAsync(args, repository, dataDirectory, true),
+                "status"       => await StatusAsync(dataDirectory),
+                "disconnect"   => await DisconnectAsync(dataDirectory),
                 "check-config" => CheckConfig(args, repository, dataDirectory),
                 _              => Unknown(args[0])
             };
@@ -105,13 +110,68 @@ internal static class RoviaCli
         if (!automatic)
             await engine.ConnectAsync(node);
         BackendStatus status = await engine.GetStatusAsync();
-        Console.WriteLine($"connected {DisplayName(node)} via {status.LocalEndpoint}");
-        Console.WriteLine("Press Ctrl+C to disconnect.");
+        EgressProbeResult egress = await new HttpEgressProbe().ProbeAsync(status.LocalEndpoint!, new("https://www.google.com/generate_204"));
+        if (!egress.Success)
+            throw new InvalidOperationException($"Proxy egress check failed ({egress.FailureKind}): {egress.Message}");
+
+        string statePath    = Path.Combine(dataDirectory, "runtime-state.json");
+        string historyPath  = Path.Combine(dataDirectory, "route-history.json");
+        string snapshotPath = Path.Combine(dataDirectory, "system-proxy.json");
+        string pipeName     = $"rovia-{Environment.UserName}";
+        DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+        RuntimeStateStore stateStore = new(statePath);
         using CancellationTokenSource exit = new();
         Console.CancelKeyPress += (_, eventArgs) => { eventArgs.Cancel = true; exit.Cancel(); };
+        RuntimeState State() => new()
+        {
+            IsRunning = !exit.IsCancellationRequested, ProcessId = Environment.ProcessId, NodeId = engine.CurrentNode?.Id,
+            NodeName = engine.CurrentNode is null ? null : DisplayName(engine.CurrentNode), LocalEndpoint = status.LocalEndpoint?.ToString(),
+            FailoverState = engine.FailoverState, StartedAt = startedAt, UpdatedAt = DateTimeOffset.UtcNow,
+            LastMessage = egress.Success ? $"Egress verified in {egress.Duration.TotalMilliseconds:0} ms." : egress.Message
+        };
+        stateStore.Write(State());
+        RuntimeControlServer server = new(pipeName, State, exit.Cancel);
+        Task serverTask             = server.RunAsync(exit.Token);
+        AdaptiveRouteMonitor monitor = new(engine, new RouteHistoryStore(historyPath), TimeSpan.FromSeconds(30));
+        Task monitorTask             = automatic ? monitor.RunAsync(exit.Token) : Task.CompletedTask;
+        IDisposable? proxyLease      = OperatingSystem.IsWindows()
+            ? SystemProxyLease.Activate(new WindowsSystemProxySettings(), snapshotPath, $"127.0.0.1:{CreateOptions(dataDirectory).ListenPort}")
+            : null;
+        Console.WriteLine($"connected {DisplayName(node)} via {status.LocalEndpoint}; egress verified");
+        Console.WriteLine("Use 'rovia disconnect' or press Ctrl+C to disconnect.");
         try { await Task.Delay(Timeout.InfiniteTimeSpan, exit.Token); } catch (OperationCanceledException) { }
+        proxyLease?.Dispose();
         await engine.DisconnectAsync();
-        Console.WriteLine("disconnected");
+        stateStore.Write(State() with { IsRunning = false, LastMessage = "Disconnected cleanly." });
+        try { await Task.WhenAll(serverTask, monitorTask); } catch (OperationCanceledException) { }
+        return 0;
+    }
+
+    private static async Task<int> StatusAsync(string dataDirectory)
+    {
+        RuntimeState? stored = new RuntimeStateStore(Path.Combine(dataDirectory, "runtime-state.json")).Read();
+        if (stored is null)
+        {
+            Console.WriteLine("stopped");
+            return 0;
+        }
+        RuntimeState state = stored.IsRunning
+            ? await new RuntimeControlClient($"rovia-{Environment.UserName}").SendAsync("status")
+            : stored;
+        Console.WriteLine($"{(state.IsRunning ? "running" : "stopped")}\t{state.NodeName ?? "-"}\t{state.LocalEndpoint ?? "-"}\t{state.LastMessage}");
+        return 0;
+    }
+
+    private static async Task<int> DisconnectAsync(string dataDirectory)
+    {
+        RuntimeState? state = new RuntimeStateStore(Path.Combine(dataDirectory, "runtime-state.json")).Read();
+        if (state is not { IsRunning: true })
+        {
+            Console.WriteLine("already stopped");
+            return 0;
+        }
+        await new RuntimeControlClient($"rovia-{Environment.UserName}").SendAsync("disconnect");
+        Console.WriteLine("disconnect requested");
         return 0;
     }
 
@@ -153,6 +213,8 @@ internal static class RoviaCli
           rovia check-config <node-id>
           rovia connect <node-id>
           rovia connect-auto
+          rovia status
+          rovia disconnect
 
         Environment:
           ROVIA_DATA_DIR     Local state directory

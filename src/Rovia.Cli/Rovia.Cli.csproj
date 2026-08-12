@@ -4,6 +4,8 @@
     <ProjectReference Include="..\Rovia.Core\Rovia.Core.csproj" />
     <ProjectReference Include="..\Rovia.Config\Rovia.Config.csproj" />
     <ProjectReference Include="..\Rovia.Backends\Rovia.Backends.csproj" />
+    <ProjectReference Include="..\Rovia.Runtime\Rovia.Runtime.csproj" />
+    <ProjectReference Include="..\Rovia.Platform.Windows\Rovia.Platform.Windows.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

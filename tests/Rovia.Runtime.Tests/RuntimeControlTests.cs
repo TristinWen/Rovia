@@ -16,11 +16,12 @@ public sealed class RuntimeControlTests
         RuntimeControlClient client = new(pipeName);
 
         RuntimeState status = await client.SendAsync("status");
-        await client.SendAsync("disconnect");
+        RuntimeState disconnect = await client.SendAsync("disconnect");
         cancellation.Cancel();
         await serverTask;
 
         Assert.True(status.IsRunning);
+        Assert.True(disconnect.IsRunning);
         Assert.True(stopped);
     }
 }
