@@ -74,6 +74,12 @@ the exact previous system proxy configuration is then restored.
 Set `ROVIA_SING_BOX` to a custom executable path, `ROVIA_LISTEN_PORT` to change
 the endpoint, or `ROVIA_DATA_DIR` to relocate local state.
 
+Rovia manages its own sing-box executable under `%LOCALAPPDATA%\Rovia\bin` on
+Windows. If the binary is missing, the next connection downloads the latest
+stable package from the official SagerNet GitHub release, verifies the SHA-256
+digest published by GitHub, and installs it atomically. `ROVIA_SING_BOX` remains
+available as an explicit override.
+
 ## Desktop
 
 Build and launch the lightweight desktop shell after building the solution:

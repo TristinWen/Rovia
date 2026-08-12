@@ -103,7 +103,8 @@ internal static class RoviaCli
     {
         if (!automatic)
             RequireArguments(args, 2, "connect requires a node identifier.");
-        await using AdaptiveRouteEngine engine = CreateEngine(repository, dataDirectory);
+        string singBoxPath = await new SingBoxProvisioner().EnsureAsync(dataDirectory);
+        await using AdaptiveRouteEngine engine = CreateEngine(repository, dataDirectory, singBoxPath);
         ProxyNode node = automatic
             ? await engine.ConnectBestAsync()
             : repository.Get(args[1]) ?? throw new InvalidOperationException($"Node '{args[1]}' was not found.");
@@ -184,16 +185,16 @@ internal static class RoviaCli
         return 0;
     }
 
-    private static AdaptiveRouteEngine CreateEngine(JsonNodeRepository repository, string dataDirectory)
+    private static AdaptiveRouteEngine CreateEngine(JsonNodeRepository repository, string dataDirectory, string? singBoxPath = null)
     {
-        SingBoxOptions options = CreateOptions(dataDirectory);
+        SingBoxOptions options = CreateOptions(dataDirectory, singBoxPath);
         return new(repository, new HealthMonitor(new TcpNodeProbe()), new RouteScorer(), new RouteSelector(),
             new FailoverEngine(), new SingBoxBackend(options, new SingBoxConfigBuilder()), new RoutingPolicy());
     }
 
-    private static SingBoxOptions CreateOptions(string dataDirectory) => new()
+    private static SingBoxOptions CreateOptions(string dataDirectory, string? singBoxPath = null) => new()
     {
-        ExecutablePath  = Environment.GetEnvironmentVariable("ROVIA_SING_BOX") ?? "sing-box",
+        ExecutablePath  = singBoxPath ?? Environment.GetEnvironmentVariable("ROVIA_SING_BOX") ?? "sing-box",
         WorkingDirectory = Path.Combine(dataDirectory, "runtime"),
         ListenPort       = int.TryParse(Environment.GetEnvironmentVariable("ROVIA_LISTEN_PORT"), out int port) ? port : 2080
     };

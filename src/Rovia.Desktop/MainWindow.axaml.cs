@@ -57,17 +57,9 @@ public partial class MainWindow : Window
                 RedirectStandardOutput = true
             };
             startInfo.Environment["ROVIA_DATA_DIR"] = _dataDirectory;
-            startInfo.Environment["ROVIA_SING_BOX"] = FindSingBoxPath();
             Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to start the Rovia runtime.");
-            MessageText.Text = "Connecting and verifying proxy egress…";
-            Task delay = Task.Delay(3500);
-            Task completed = await Task.WhenAny(process.WaitForExitAsync(), delay);
-            if (completed != delay)
-            {
-                string error = await process.StandardError.ReadToEndAsync();
-                string output = await process.StandardOutput.ReadToEndAsync();
-                throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? output.Trim() : error.Trim());
-            }
+            MessageText.Text = "Preparing sing-box and verifying proxy egress…";
+            await WaitForRuntimeAsync(process);
             await RefreshStatusAsync();
         }
         catch (Exception exception)
@@ -117,6 +109,25 @@ public partial class MainWindow : Window
         MessageText.Text = state?.LastMessage ?? "Ready.";
     }
 
+    private async Task WaitForRuntimeAsync(Process process)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddMinutes(2);
+        string statePath        = Path.Combine(_dataDirectory, "runtime-state.json");
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (process.HasExited)
+            {
+                string error  = await process.StandardError.ReadToEndAsync();
+                string output = await process.StandardOutput.ReadToEndAsync();
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? output.Trim() : error.Trim());
+            }
+            if (new RuntimeStateStore(statePath).Read() is { IsRunning: true })
+                return;
+            await Task.Delay(500);
+        }
+        throw new TimeoutException("Rovia did not finish preparing sing-box within two minutes.");
+    }
+
     private void ReloadNodes()
     {
         _nodes.Clear();
@@ -138,15 +149,6 @@ public partial class MainWindow : Window
             directory = directory.Parent;
         }
         throw new FileNotFoundException("Build Rovia.Cli in Release mode or place rovia.exe beside Rovia.Desktop.");
-    }
-
-    private static string FindSingBoxPath()
-    {
-        string? configured = Environment.GetEnvironmentVariable("ROVIA_SING_BOX");
-        if (!string.IsNullOrWhiteSpace(configured) && File.Exists(configured))
-            return configured;
-        string v2rayPath = @"D:\Softwares\v2rayN\bin\sing_box\sing-box.exe";
-        return File.Exists(v2rayPath) ? v2rayPath : "sing-box";
     }
 
     private static string DisplayName(ProxyNode node) => string.IsNullOrWhiteSpace(node.Name) ? node.Host : node.Name;
