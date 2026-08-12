@@ -11,6 +11,9 @@ public sealed class SingBoxBackend(SingBoxOptions options, SingBoxConfigBuilder 
     private string? _nodeId;
     private string? _lastError;
 
+    public BackendCapabilities Capabilities { get; } = new(true, true, true, false,
+        new HashSet<ProxyProtocol> { ProxyProtocol.Vless, ProxyProtocol.Vmess, ProxyProtocol.Trojan, ProxyProtocol.Shadowsocks });
+
     public async Task StartAsync(ProxyNode node, CancellationToken cancellationToken = default)
     {
         if (_process is { HasExited: false })

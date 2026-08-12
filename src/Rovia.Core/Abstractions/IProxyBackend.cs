@@ -5,6 +5,7 @@ namespace Rovia.Core.Abstractions;
 /// <summary>Controls an external proxy transport backend.</summary>
 public interface IProxyBackend : IAsyncDisposable
 {
+    BackendCapabilities Capabilities { get; }
     Task StartAsync(ProxyNode node, CancellationToken cancellationToken = default);
     Task StopAsync(CancellationToken cancellationToken = default);
     Task SwitchNodeAsync(ProxyNode node, CancellationToken cancellationToken = default);

@@ -39,6 +39,7 @@ public sealed class AdaptiveRouteEngineTests
 
     private sealed class StubBackend : IProxyBackend
     {
+        public BackendCapabilities Capabilities { get; } = new(false, false, false, true, new HashSet<ProxyProtocol>());
         public ProxyNode? StartedNode { get; private set; }
         public Task StartAsync(ProxyNode node, CancellationToken cancellationToken = default) { StartedNode = node; return Task.CompletedTask; }
         public Task StopAsync(CancellationToken cancellationToken = default) { StartedNode = null; return Task.CompletedTask; }
