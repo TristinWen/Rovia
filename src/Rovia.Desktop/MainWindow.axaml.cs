@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Rovia.Config.Parsing;
 using Rovia.Config.Storage;
+using Rovia.Config.Subscriptions;
 using Rovia.Core.Models;
 using Rovia.Runtime.Runtime;
 
@@ -41,6 +42,25 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void ImportSubscriptionClicked(object? sender, RoutedEventArgs eventArgs)
+    {
+        try
+        {
+            if (!Uri.TryCreate(SubscriptionTextBox.Text, UriKind.Absolute, out Uri? source) || source.Scheme is not ("http" or "https"))
+                throw new InvalidOperationException("Enter a valid HTTP or HTTPS subscription URL.");
+            SubscriptionImporter importer = new([new VlessLinkParser(), new TrojanLinkParser(), new VmessLinkParser(), new ShadowsocksLinkParser()]);
+            SubscriptionImportResult result = await importer.ImportAsync(source);
+            foreach (ProxyNode node in result.Nodes)
+                _repository.Add(node);
+            ReloadNodes();
+            MessageText.Text = $"Imported {result.Nodes.Count} nodes; skipped {result.DuplicateCount} duplicates and {result.Warnings.Count} invalid entries.";
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or IOException)
+        {
+            MessageText.Text = exception.Message;
+        }
+    }
+
     private async void ConnectClicked(object? sender, RoutedEventArgs eventArgs)
     {
         try
@@ -57,6 +77,7 @@ public partial class MainWindow : Window
                 RedirectStandardOutput = true
             };
             startInfo.Environment["ROVIA_DATA_DIR"] = _dataDirectory;
+            startInfo.Environment["ROVIA_MODE"]     = (ModeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "system-proxy";
             Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to start the Rovia runtime.");
             MessageText.Text = "Preparing sing-box and verifying proxy egress…";
             await WaitForRuntimeAsync(process);
@@ -105,6 +126,29 @@ public partial class MainWindow : Window
             RuntimeState state = await new RuntimeControlClient($"rovia-{Environment.UserName}").SendAsync("speed-test", TimeSpan.FromSeconds(30));
             ShowPerformance(state);
             MessageText.Text = state.LastMessage;
+        }
+        catch (Exception exception)
+        {
+            MessageText.Text = exception.Message;
+        }
+    }
+
+    private async void ProbeClicked(object? sender, RoutedEventArgs eventArgs) => await RunCliCommandAsync("rank", "Probing all nodes…");
+
+    private async void DiagnoseClicked(object? sender, RoutedEventArgs eventArgs) => await RunCliCommandAsync("diagnose", "Running DNS and egress diagnostics…");
+
+    private async Task RunCliCommandAsync(string command, string progress)
+    {
+        try
+        {
+            MessageText.Text = progress;
+            ProcessStartInfo startInfo = new(FindCliPath(), command) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            startInfo.Environment["ROVIA_DATA_DIR"] = _dataDirectory;
+            using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to start the Rovia command.");
+            string output = await process.StandardOutput.ReadToEndAsync();
+            string error  = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            MessageText.Text = string.IsNullOrWhiteSpace(error) ? output.Trim().Replace(Environment.NewLine, " · ") : error.Trim();
         }
         catch (Exception exception)
         {

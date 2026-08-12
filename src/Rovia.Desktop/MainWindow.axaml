@@ -4,7 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="920" d:DesignHeight="620"
         x:Class="Rovia.Desktop.MainWindow"
-        Width="920" Height="620" MinWidth="720" MinHeight="480"
+        Width="1000" Height="720" MinWidth="780" MinHeight="560"
         Title="Rovia">
   <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="24">
     <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,20">
@@ -13,23 +13,34 @@
     </StackPanel>
 
     <Border Grid.Row="1" Background="#151D2A" CornerRadius="10" Padding="16" Margin="0,0,0,16">
-      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+      <Grid ColumnDefinitions="*,220,Auto" RowDefinitions="Auto,Auto,Auto">
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Runtime status" Opacity="0.65" />
         <TextBlock x:Name="StatusText" Grid.Row="1" Grid.Column="0" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
         <TextBlock x:Name="PerformanceText" Grid.Row="2" Grid.Column="0" Text="Latency — · Download —" Margin="0,6,0,0" Opacity="0.75" />
-        <StackPanel Grid.RowSpan="3" Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+        <StackPanel Grid.RowSpan="3" Grid.Column="1" Margin="16,0" Spacing="4">
+          <TextBlock Text="Traffic mode" Opacity="0.65" />
+          <ComboBox x:Name="ModeComboBox" SelectedIndex="0">
+            <ComboBoxItem Content="System proxy" Tag="system-proxy" />
+            <ComboBoxItem Content="TUN (administrator)" Tag="tun" />
+          </ComboBox>
+        </StackPanel>
+        <StackPanel Grid.RowSpan="3" Grid.Column="2" Spacing="8" VerticalAlignment="Center">
           <Button Content="Refresh" Click="RefreshClicked" />
           <Button Content="Speed test" Click="SpeedTestClicked" />
         </StackPanel>
       </Grid>
     </Border>
 
-    <Grid Grid.Row="2" RowDefinitions="Auto,*">
-      <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+    <Grid Grid.Row="2" RowDefinitions="Auto,Auto,*">
+      <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
         <TextBox x:Name="LinkTextBox" Watermark="Paste a VLESS share link" Margin="0,0,8,0" />
         <Button Grid.Column="1" Content="Import" Click="ImportClicked" />
       </Grid>
-      <Border Grid.Row="1" BorderBrush="#334155" BorderThickness="1" CornerRadius="8">
+      <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+        <TextBox x:Name="SubscriptionTextBox" Watermark="Subscription URL" Margin="0,0,8,0" />
+        <Button Grid.Column="1" Content="Import subscription" Click="ImportSubscriptionClicked" />
+      </Grid>
+      <Border Grid.Row="2" BorderBrush="#334155" BorderThickness="1" CornerRadius="8">
         <ListBox x:Name="NodeList">
           <ListBox.ItemTemplate>
             <DataTemplate>
@@ -46,12 +57,14 @@
       </Border>
     </Grid>
 
-    <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,Auto,*,Auto" Margin="0,16,0,0">
+    <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" Margin="0,16,0,0">
       <Button Content="Connect automatically" Click="ConnectClicked" Margin="0,0,8,0" />
       <Button Grid.Column="1" Content="Disconnect" Click="DisconnectClicked" />
       <Button Grid.Column="2" Content="Delete selected" Click="DeleteClicked" Margin="8,0,0,0" />
-      <TextBlock x:Name="MessageText" Grid.Column="3" Margin="16,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-      <TextBlock Grid.Column="4" Text="Local proxy 127.0.0.1:2080" VerticalAlignment="Center" Opacity="0.55" />
+      <Button Grid.Column="3" Content="Probe all" Click="ProbeClicked" Margin="8,0,0,0" />
+      <Button Grid.Column="4" Content="Diagnose" Click="DiagnoseClicked" Margin="8,0,0,0" />
+      <TextBlock x:Name="MessageText" Grid.Column="5" Margin="16,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      <TextBlock Grid.Column="6" Text="Local proxy 127.0.0.1:2080" VerticalAlignment="Center" Opacity="0.55" />
     </Grid>
   </Grid>
 </Window>

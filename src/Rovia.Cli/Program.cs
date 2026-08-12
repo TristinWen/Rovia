@@ -42,6 +42,7 @@ internal static class RoviaCli
                 "status"       => await StatusAsync(dataDirectory),
                 "disconnect"   => await DisconnectAsync(dataDirectory),
                 "speed-test"   => await SpeedTestAsync(dataDirectory),
+                "diagnose"     => await DiagnoseAsync(dataDirectory),
                 "check-config" => CheckConfig(args, repository, dataDirectory),
                 _              => Unknown(args[0])
             };
@@ -188,6 +189,17 @@ internal static class RoviaCli
         return 0;
     }
 
+    private static async Task<int> DiagnoseAsync(string dataDirectory)
+    {
+        RuntimeState? state = new RuntimeStateStore(Path.Combine(dataDirectory, "runtime-state.json")).Read();
+        if (state is not { IsRunning: true } || !Uri.TryCreate(state.LocalEndpoint, UriKind.Absolute, out Uri? endpoint))
+            throw new InvalidOperationException("Rovia is not connected.");
+        IReadOnlyList<DiagnosticTargetResult> results = await new MultiTargetDiagnostic(new HttpEgressProbe()).RunAsync(endpoint);
+        foreach (DiagnosticTargetResult result in results)
+            Console.WriteLine($"{result.Target.Host}\tdns={(result.DnsResolved ? "ok" : "failed")}\tegress={(result.Egress.Success ? "ok" : result.Egress.FailureKind.ToString().ToLowerInvariant())}\t{result.Egress.Duration.TotalMilliseconds:0} ms");
+        return results.Any(result => result.Egress.Success) ? 0 : 2;
+    }
+
     private static async Task<int> DisconnectAsync(string dataDirectory)
     {
         RuntimeState? state = new RuntimeStateStore(Path.Combine(dataDirectory, "runtime-state.json")).Read();
@@ -245,6 +257,7 @@ internal static class RoviaCli
           rovia status
           rovia disconnect
           rovia speed-test
+          rovia diagnose
 
         Environment:
           ROVIA_DATA_DIR     Local state directory
