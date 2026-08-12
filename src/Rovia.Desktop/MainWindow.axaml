@@ -13,10 +13,14 @@
     </StackPanel>
 
     <Border Grid.Row="1" Background="#151D2A" CornerRadius="10" Padding="16" Margin="0,0,0,16">
-      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+      <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
         <TextBlock Grid.Row="0" Grid.Column="0" Text="Runtime status" Opacity="0.65" />
         <TextBlock x:Name="StatusText" Grid.Row="1" Grid.Column="0" Text="Checking…" FontSize="18" FontWeight="SemiBold" />
-        <Button Grid.RowSpan="2" Grid.Column="1" Content="Refresh" Click="RefreshClicked" VerticalAlignment="Center" />
+        <TextBlock x:Name="PerformanceText" Grid.Row="2" Grid.Column="0" Text="Latency — · Download —" Margin="0,6,0,0" Opacity="0.75" />
+        <StackPanel Grid.RowSpan="3" Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+          <Button Content="Refresh" Click="RefreshClicked" />
+          <Button Content="Speed test" Click="SpeedTestClicked" />
+        </StackPanel>
       </Grid>
     </Border>
 

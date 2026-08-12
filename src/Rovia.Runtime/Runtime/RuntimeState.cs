@@ -14,4 +14,7 @@ public sealed record RuntimeState
     public DateTimeOffset    StartedAt       { get; init; }
     public DateTimeOffset    UpdatedAt       { get; init; }
     public string?           LastMessage     { get; init; }
+    public double?           ProxyLatencyMs  { get; init; }
+    public double?           DownloadMbps    { get; init; }
+    public DateTimeOffset?   PerformanceAt   { get; init; }
 }

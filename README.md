@@ -64,6 +64,7 @@ rovia check-config <node-id>
 rovia connect <node-id>
 rovia connect-auto
 rovia status
+rovia speed-test
 rovia disconnect
 ```
 
@@ -73,6 +74,10 @@ Windows system proxy. Use `disconnect` or press Ctrl+C for an orderly shutdown;
 the exact previous system proxy configuration is then restored.
 Set `ROVIA_SING_BOX` to a custom executable path, `ROVIA_LISTEN_PORT` to change
 the endpoint, or `ROVIA_DATA_DIR` to relocate local state.
+
+`speed-test` warms the proxy connection, reports the median of three application
+latency samples, and streams at most 5 MB to estimate download throughput. It is
+manual by design so periodic route monitoring does not consume significant data.
 
 Rovia manages its own sing-box executable under `%LOCALAPPDATA%\Rovia\bin` on
 Windows. If the binary is missing, the next connection downloads the latest

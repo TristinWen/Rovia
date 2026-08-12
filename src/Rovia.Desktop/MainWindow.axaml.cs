@@ -97,6 +97,21 @@ public partial class MainWindow : Window
 
     private async void RefreshClicked(object? sender, RoutedEventArgs eventArgs) => await RefreshStatusAsync();
 
+    private async void SpeedTestClicked(object? sender, RoutedEventArgs eventArgs)
+    {
+        try
+        {
+            MessageText.Text = "Measuring warmed latency and up to 5 MB download throughput…";
+            RuntimeState state = await new RuntimeControlClient($"rovia-{Environment.UserName}").SendAsync("speed-test", TimeSpan.FromSeconds(30));
+            ShowPerformance(state);
+            MessageText.Text = state.LastMessage;
+        }
+        catch (Exception exception)
+        {
+            MessageText.Text = exception.Message;
+        }
+    }
+
     private async Task RefreshStatusAsync()
     {
         RuntimeState? state = new RuntimeStateStore(Path.Combine(_dataDirectory, "runtime-state.json")).Read();
@@ -107,6 +122,14 @@ public partial class MainWindow : Window
         }
         StatusText.Text  = state is { IsRunning: true } ? $"Connected · {state.NodeName} · {state.LocalEndpoint}" : "Disconnected";
         MessageText.Text = state?.LastMessage ?? "Ready.";
+        ShowPerformance(state);
+    }
+
+    private void ShowPerformance(RuntimeState? state)
+    {
+        string latency = state?.ProxyLatencyMs is double latencyValue ? $"{latencyValue:0.0} ms" : "—";
+        string speed   = state?.DownloadMbps is double speedValue ? $"{speedValue:0.0} Mbps" : "—";
+        PerformanceText.Text = $"Proxy latency {latency} · Download {speed}";
     }
 
     private async Task WaitForRuntimeAsync(Process process)

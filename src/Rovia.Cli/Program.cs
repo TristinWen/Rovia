@@ -41,6 +41,7 @@ internal static class RoviaCli
                 "connect-auto" => await ConnectAsync(args, repository, dataDirectory, true),
                 "status"       => await StatusAsync(dataDirectory),
                 "disconnect"   => await DisconnectAsync(dataDirectory),
+                "speed-test"   => await SpeedTestAsync(dataDirectory),
                 "check-config" => CheckConfig(args, repository, dataDirectory),
                 _              => Unknown(args[0])
             };
@@ -103,6 +104,9 @@ internal static class RoviaCli
     {
         if (!automatic)
             RequireArguments(args, 2, "connect requires a node identifier.");
+        using Mutex runtimeMutex = new(false, $"Rovia.Runtime.{Environment.UserName}", out bool ownsRuntime);
+        if (!ownsRuntime)
+            throw new InvalidOperationException("Another Rovia runtime is already connected or connecting.");
         string singBoxPath = await new SingBoxProvisioner().EnsureAsync(dataDirectory);
         await using AdaptiveRouteEngine engine = CreateEngine(repository, dataDirectory, singBoxPath);
         ProxyNode node = automatic
@@ -120,6 +124,8 @@ internal static class RoviaCli
         string snapshotPath = Path.Combine(dataDirectory, "system-proxy.json");
         string pipeName     = $"rovia-{Environment.UserName}";
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+        ProxyPerformance? performance = null;
+        using HttpProxyPerformanceProbe performanceProbe = new();
         RuntimeStateStore stateStore = new(statePath);
         using CancellationTokenSource exit = new();
         Console.CancelKeyPress += (_, eventArgs) => { eventArgs.Cancel = true; exit.Cancel(); };
@@ -128,10 +134,16 @@ internal static class RoviaCli
             IsRunning = !exit.IsCancellationRequested, ProcessId = Environment.ProcessId, NodeId = engine.CurrentNode?.Id,
             NodeName = engine.CurrentNode is null ? null : DisplayName(engine.CurrentNode), LocalEndpoint = status.LocalEndpoint?.ToString(),
             FailoverState = engine.FailoverState, StartedAt = startedAt, UpdatedAt = DateTimeOffset.UtcNow,
-            LastMessage = egress.Success ? $"Egress verified in {egress.Duration.TotalMilliseconds:0} ms." : egress.Message
+            LastMessage = performance?.Message ?? (egress.Success ? $"Egress verified in {egress.Duration.TotalMilliseconds:0} ms." : egress.Message),
+            ProxyLatencyMs = performance?.LatencyMs, DownloadMbps = performance?.DownloadMbps, PerformanceAt = performance?.MeasuredAt
         };
         stateStore.Write(State());
-        RuntimeControlServer server = new(pipeName, State, exit.Cancel);
+        async Task MeasurePerformance(CancellationToken token)
+        {
+            performance = await performanceProbe.MeasureAsync(status.LocalEndpoint!, token);
+            stateStore.Write(State());
+        }
+        RuntimeControlServer server = new(pipeName, State, exit.Cancel, MeasurePerformance);
         Task serverTask             = server.RunAsync(exit.Token);
         AdaptiveRouteMonitor monitor = new(engine, new RouteHistoryStore(historyPath), TimeSpan.FromSeconds(30));
         Task monitorTask             = automatic ? monitor.RunAsync(exit.Token) : Task.CompletedTask;
@@ -160,6 +172,18 @@ internal static class RoviaCli
             ? await new RuntimeControlClient($"rovia-{Environment.UserName}").SendAsync("status")
             : stored;
         Console.WriteLine($"{(state.IsRunning ? "running" : "stopped")}\t{state.NodeName ?? "-"}\t{state.LocalEndpoint ?? "-"}\t{state.LastMessage}");
+        if (state.ProxyLatencyMs.HasValue || state.DownloadMbps.HasValue)
+            Console.WriteLine($"latency={FormatMetric(state.ProxyLatencyMs, "ms")}\tdownload={FormatMetric(state.DownloadMbps, "Mbps")}");
+        return 0;
+    }
+
+    private static async Task<int> SpeedTestAsync(string dataDirectory)
+    {
+        RuntimeState? state = new RuntimeStateStore(Path.Combine(dataDirectory, "runtime-state.json")).Read();
+        if (state is not { IsRunning: true })
+            throw new InvalidOperationException("Rovia is not connected.");
+        RuntimeState measured = await new RuntimeControlClient($"rovia-{Environment.UserName}").SendAsync("speed-test", TimeSpan.FromSeconds(30));
+        Console.WriteLine($"latency={FormatMetric(measured.ProxyLatencyMs, "ms")}\tdownload={FormatMetric(measured.DownloadMbps, "Mbps")}");
         return 0;
     }
 
@@ -201,6 +225,7 @@ internal static class RoviaCli
 
     private static string DisplayName(ProxyNode node) => string.IsNullOrWhiteSpace(node.Name) ? node.Host : node.Name;
     private static string FormatMs(double? value) => value.HasValue ? $"{value:0.0} ms" : "unreachable";
+    private static string FormatMetric(double? value, string unit) => value.HasValue ? $"{value:0.0} {unit}" : "unavailable";
     private static void RequireArguments(string[] args, int count, string message) { if (args.Length < count) throw new InvalidOperationException(message); }
     private static int Unknown(string command) { Console.Error.WriteLine($"error: unknown command '{command}'"); PrintUsage(); return 1; }
 
@@ -216,6 +241,7 @@ internal static class RoviaCli
           rovia connect-auto
           rovia status
           rovia disconnect
+          rovia speed-test
 
         Environment:
           ROVIA_DATA_DIR     Local state directory
