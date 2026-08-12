@@ -1,0 +1,26 @@
+using Rovia.Runtime.Runtime;
+
+namespace Rovia.Runtime.Tests;
+
+/// <summary>Validates named-pipe runtime commands.</summary>
+public sealed class RuntimeControlTests
+{
+    [Fact]
+    public async Task SendAsync_ReturnsStatusAndRequestsDisconnect()
+    {
+        string pipeName = $"rovia-tests-{Guid.NewGuid():N}";
+        bool stopped    = false;
+        using CancellationTokenSource cancellation = new();
+        RuntimeControlServer server = new(pipeName, () => new RuntimeState { IsRunning = true, ProcessId = Environment.ProcessId }, () => stopped = true);
+        Task serverTask = server.RunAsync(cancellation.Token);
+        RuntimeControlClient client = new(pipeName);
+
+        RuntimeState status = await client.SendAsync("status");
+        await client.SendAsync("disconnect");
+        cancellation.Cancel();
+        await serverTask;
+
+        Assert.True(status.IsRunning);
+        Assert.True(stopped);
+    }
+}
