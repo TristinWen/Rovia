@@ -51,14 +51,23 @@ public partial class MainWindow : Window
             string cliPath = FindCliPath();
             ProcessStartInfo startInfo = new(cliPath, "connect-auto")
             {
-                UseShellExecute = false,
-                CreateNoWindow  = true
+                UseShellExecute        = false,
+                CreateNoWindow         = true,
+                RedirectStandardError  = true,
+                RedirectStandardOutput = true
             };
             startInfo.Environment["ROVIA_DATA_DIR"] = _dataDirectory;
             startInfo.Environment["ROVIA_SING_BOX"] = FindSingBoxPath();
-            Process.Start(startInfo);
+            Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to start the Rovia runtime.");
             MessageText.Text = "Connecting and verifying proxy egress…";
-            await Task.Delay(3500);
+            Task delay = Task.Delay(3500);
+            Task completed = await Task.WhenAny(process.WaitForExitAsync(), delay);
+            if (completed != delay)
+            {
+                string error = await process.StandardError.ReadToEndAsync();
+                string output = await process.StandardOutput.ReadToEndAsync();
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? output.Trim() : error.Trim());
+            }
             await RefreshStatusAsync();
         }
         catch (Exception exception)
@@ -82,6 +91,18 @@ public partial class MainWindow : Window
         }
     }
 
+    private void DeleteClicked(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (NodeList.SelectedItem is not NodeItem selected)
+        {
+            MessageText.Text = "Select a node to delete.";
+            return;
+        }
+        _repository.Remove(selected.Id);
+        ReloadNodes();
+        MessageText.Text = $"Deleted {selected.Name}.";
+    }
+
     private async void RefreshClicked(object? sender, RoutedEventArgs eventArgs) => await RefreshStatusAsync();
 
     private async Task RefreshStatusAsync()
@@ -100,7 +121,7 @@ public partial class MainWindow : Window
     {
         _nodes.Clear();
         foreach (ProxyNode node in _repository.GetAll())
-            _nodes.Add(new(DisplayName(node), $"{node.Host}:{node.Port}", node.Protocol.ToString()));
+            _nodes.Add(new(node.Id, DisplayName(node), $"{node.Host}:{node.Port}", node.Protocol.ToString()));
     }
 
     private static string FindCliPath()
@@ -130,5 +151,5 @@ public partial class MainWindow : Window
 
     private static string DisplayName(ProxyNode node) => string.IsNullOrWhiteSpace(node.Name) ? node.Host : node.Name;
 
-    private sealed record NodeItem(string Name, string Endpoint, string Protocol);
+    private sealed record NodeItem(string Id, string Name, string Endpoint, string Protocol);
 }

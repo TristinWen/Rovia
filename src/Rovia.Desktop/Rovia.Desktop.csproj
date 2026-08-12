@@ -19,7 +19,19 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Rovia.Cli\Rovia.Cli.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Rovia.Backends\Rovia.Backends.csproj" />
     <ProjectReference Include="..\Rovia.Config\Rovia.Config.csproj" />
+    <ProjectReference Include="..\Rovia.Platform.Windows\Rovia.Platform.Windows.csproj" />
     <ProjectReference Include="..\Rovia.Runtime\Rovia.Runtime.csproj" />
   </ItemGroup>
+
+  <Target Name="CopyCliRuntime" AfterTargets="Build">
+    <ItemGroup>
+      <CliRuntimeFile Include="..\Rovia.Cli\bin\$(Configuration)\$(TargetFramework)\rovia.exe" />
+      <CliRuntimeFile Include="..\Rovia.Cli\bin\$(Configuration)\$(TargetFramework)\rovia.dll" />
+      <CliRuntimeFile Include="..\Rovia.Cli\bin\$(Configuration)\$(TargetFramework)\rovia.deps.json" />
+      <CliRuntimeFile Include="..\Rovia.Cli\bin\$(Configuration)\$(TargetFramework)\rovia.runtimeconfig.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CliRuntimeFile)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

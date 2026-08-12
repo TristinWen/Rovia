@@ -12,7 +12,7 @@ public sealed class RuntimeStateStore(string path)
         if (!File.Exists(path))
             return null;
         RuntimeState? state = JsonSerializer.Deserialize<RuntimeState>(File.ReadAllText(path), JsonOptions);
-        if (state is not null && !IsProcessAlive(state.ProcessId))
+        if (state is { IsRunning: true } && !IsProcessAlive(state.ProcessId))
             return state with { IsRunning = false, UpdatedAt = DateTimeOffset.UtcNow, LastMessage = "Runtime process is no longer running." };
         return state;
     }
