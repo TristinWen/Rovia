@@ -12,6 +12,7 @@ public sealed class HttpProxyPerformanceProbe : IProxyPerformanceProbe, IDisposa
     private readonly Uri _downloadTarget;
     private readonly int _latencySamples;
     private readonly long _maximumBytes;
+    private readonly TimeSpan _maximumDownloadDuration;
     private readonly TimeSpan _timeout;
     private HttpClient? _client;
     private Uri? _proxyEndpoint;
@@ -20,7 +21,8 @@ public sealed class HttpProxyPerformanceProbe : IProxyPerformanceProbe, IDisposa
         Uri? latencyTarget = null,
         Uri? downloadTarget = null,
         int latencySamples = 3,
-        long maximumBytes = 5 * 1024 * 1024,
+        long maximumBytes = 512 * 1024,
+        TimeSpan? maximumDownloadDuration = null,
         TimeSpan? timeout = null)
     {
         if (latencySamples < 1)
@@ -31,6 +33,7 @@ public sealed class HttpProxyPerformanceProbe : IProxyPerformanceProbe, IDisposa
         _downloadTarget = downloadTarget ?? new("http://speedtest.tele2.net/10MB.zip");
         _latencySamples = latencySamples;
         _maximumBytes   = maximumBytes;
+        _maximumDownloadDuration = maximumDownloadDuration ?? TimeSpan.FromSeconds(3);
         _timeout        = timeout ?? TimeSpan.FromSeconds(20);
     }
 
@@ -99,7 +102,7 @@ public sealed class HttpProxyPerformanceProbe : IProxyPerformanceProbe, IDisposa
         byte[] buffer = new byte[64 * 1024];
         long total = 0;
         Stopwatch stopwatch = Stopwatch.StartNew();
-        while (total < _maximumBytes)
+        while (total < _maximumBytes && stopwatch.Elapsed < _maximumDownloadDuration)
         {
             int requested = (int)Math.Min(buffer.Length, _maximumBytes - total);
             int read      = await stream.ReadAsync(buffer.AsMemory(0, requested), cancellationToken);

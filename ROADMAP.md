@@ -35,7 +35,7 @@ Implemented and validated:
 - TCP health samples, rolling success/failure metrics, stability-first scoring,
   deterministic ranking, hysteresis, and explicit failover state.
 - Real proxy egress checks, multi-target diagnostics, warmed median proxy latency,
-  and bounded 5 MB download throughput measurements.
+  and bounded quick download throughput measurements.
 - Cross-process runtime status, speed-test, diagnostics, and clean disconnect.
 - Windows system-proxy snapshot and restoration.
 - Opt-in sing-box TUN configuration with strict automatic routes.

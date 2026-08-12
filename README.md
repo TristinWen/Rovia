@@ -87,7 +87,7 @@ normally requires an elevated Windows process and does not modify the Windows
 HTTP proxy. The default `system-proxy` mode remains safer for ordinary browsing.
 
 `speed-test` warms the proxy connection, reports the median of three application
-latency samples, and streams at most 5 MB to estimate download throughput. It is
+latency samples, and streams at most 512 KB for up to 3 seconds to estimate download throughput. It is
 manual by design so periodic route monitoring does not consume significant data.
 
 Rovia manages its own sing-box executable under `%LOCALAPPDATA%\Rovia\bin` on

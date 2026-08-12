@@ -19,7 +19,7 @@ public sealed class HttpProxyPerformanceProbeTests
         Task server = ServeAsync(listener, cancellation.Token);
         using HttpProxyPerformanceProbe probe = new(
             new Uri($"http://127.0.0.1:{port}/latency"), new Uri($"http://127.0.0.1:{port}/download"),
-            latencySamples: 2, maximumBytes: 4096, timeout: TimeSpan.FromSeconds(5));
+            latencySamples: 2, maximumBytes: 4096, maximumDownloadDuration: TimeSpan.FromSeconds(1), timeout: TimeSpan.FromSeconds(5));
 
         ProxyPerformance result = await probe.MeasureAsync(new Uri($"http://127.0.0.1:{port}"));
         cancellation.Cancel();

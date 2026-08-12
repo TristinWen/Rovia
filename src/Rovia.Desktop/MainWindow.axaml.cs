@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private readonly string _dataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Rovia");
     private readonly ObservableCollection<NodeItem> _nodes = [];
     private readonly JsonNodeRepository _repository;
+    private bool _speedTestRunning;
 
     public MainWindow()
     {
@@ -61,7 +62,19 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void ConnectClicked(object? sender, RoutedEventArgs eventArgs)
+    private async void ConnectBestClicked(object? sender, RoutedEventArgs eventArgs) => await ConnectAsync("connect-auto");
+
+    private async void ConnectSelectedClicked(object? sender, RoutedEventArgs eventArgs)
+    {
+        if (NodeList.SelectedItem is not NodeItem selected)
+        {
+            MessageText.Text = "Select a node to connect.";
+            return;
+        }
+        await ConnectAsync($"connect {selected.Id}");
+    }
+
+    private async Task ConnectAsync(string command)
     {
         try
         {
@@ -69,7 +82,7 @@ public partial class MainWindow : Window
             if (state is { IsRunning: true })
                 throw new InvalidOperationException("Rovia is already connected.");
             string cliPath = FindCliPath();
-            ProcessStartInfo startInfo = new(cliPath, "connect-auto")
+            ProcessStartInfo startInfo = new(cliPath, command)
             {
                 UseShellExecute        = false,
                 CreateNoWindow         = true,
@@ -120,9 +133,15 @@ public partial class MainWindow : Window
 
     private async void SpeedTestClicked(object? sender, RoutedEventArgs eventArgs)
     {
+        if (_speedTestRunning)
+        {
+            MessageText.Text = "A speed test is already running.";
+            return;
+        }
         try
         {
-            MessageText.Text = "Measuring warmed latency and up to 5 MB download throughput…";
+            _speedTestRunning = true;
+            MessageText.Text = "Quick test: warming connection and sampling up to 512 KB for 3 seconds…";
             RuntimeState state = await new RuntimeControlClient($"rovia-{Environment.UserName}").SendAsync("speed-test", TimeSpan.FromSeconds(30));
             ShowPerformance(state);
             MessageText.Text = state.LastMessage;
@@ -130,6 +149,10 @@ public partial class MainWindow : Window
         catch (Exception exception)
         {
             MessageText.Text = exception.Message;
+        }
+        finally
+        {
+            _speedTestRunning = false;
         }
     }
 
