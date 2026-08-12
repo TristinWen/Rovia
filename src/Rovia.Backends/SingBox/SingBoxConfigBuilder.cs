@@ -11,16 +11,13 @@ public sealed class SingBoxConfigBuilder
 
     public string Build(ProxyNode node, SingBoxOptions options)
     {
-        if (node.Protocol != ProxyProtocol.Vless)
-            throw new NotSupportedException($"The sing-box adapter does not yet support {node.Protocol}.");
-
-        JsonObject outbound = new()
+        JsonObject outbound = node.Protocol switch
         {
-            ["type"]    = "vless",
-            ["tag"]     = "proxy",
-            ["server"]  = node.Host,
-            ["server_port"] = node.Port,
-            ["uuid"]    = node.Credentials.Username
+            ProxyProtocol.Vless       => BuildUuidOutbound("vless", node),
+            ProxyProtocol.Vmess       => BuildUuidOutbound("vmess", node),
+            ProxyProtocol.Trojan      => BuildPasswordOutbound("trojan", node),
+            ProxyProtocol.Shadowsocks => BuildShadowsocksOutbound(node),
+            _ => throw new NotSupportedException($"The sing-box adapter does not yet support {node.Protocol}.")
         };
         Add(outbound, "flow", node.Flow);
         if (node.Tls is not null)
@@ -44,6 +41,22 @@ public sealed class SingBoxConfigBuilder
         };
         return root.ToJsonString(JsonOptions);
     }
+
+    private static JsonObject BuildUuidOutbound(string type, ProxyNode node) => new()
+    {
+        ["type"] = type, ["tag"] = "proxy", ["server"] = node.Host, ["server_port"] = node.Port, ["uuid"] = node.Credentials.Username
+    };
+
+    private static JsonObject BuildPasswordOutbound(string type, ProxyNode node) => new()
+    {
+        ["type"] = type, ["tag"] = "proxy", ["server"] = node.Host, ["server_port"] = node.Port, ["password"] = node.Credentials.Password
+    };
+
+    private static JsonObject BuildShadowsocksOutbound(ProxyNode node) => new()
+    {
+        ["type"] = "shadowsocks", ["tag"] = "proxy", ["server"] = node.Host, ["server_port"] = node.Port,
+        ["method"] = node.Metadata.GetValueOrDefault("method") ?? node.Credentials.Username, ["password"] = node.Credentials.Password
+    };
 
     private static JsonObject BuildTls(ProxyNode node)
     {

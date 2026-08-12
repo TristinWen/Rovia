@@ -7,5 +7,6 @@ public enum ProxyProtocol
     Vmess,
     Trojan,
     Hysteria2,
-    Tuic
+    Tuic,
+    Shadowsocks
 }
