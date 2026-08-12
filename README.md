@@ -33,6 +33,8 @@ The dependency direction is intentionally constrained:
 
 - Backend-independent domain models and a reusable high-level routing engine.
 - VLESS parsing for TLS, Reality, flow, WebSocket, HTTP, and gRPC parameters.
+- Trojan, VMess, and SIP002 Shadowsocks parsing and sing-box mapping.
+- Plain-text and Base64 subscription import with stable deduplication.
 - Durable local JSON storage with unknown share-link parameters preserved.
 - Bounded TCP health probes with rolling success, failure, latency, and jitter metrics.
 - Deterministic stability-first scoring, hysteresis, and emergency failover.
@@ -40,6 +42,7 @@ The dependency direction is intentionally constrained:
 - A CLI for importing, inspecting, probing, ranking, and connecting nodes.
 - A controllable runtime host with automatic monitoring and route history.
 - Safe Windows system proxy activation with previous-setting restoration.
+- Optional transparent TUN capture for applications that ignore system proxies.
 - A simple Avalonia desktop control panel shared with the same Core and runtime.
 
 ## Build and test
@@ -65,6 +68,7 @@ rovia connect <node-id>
 rovia connect-auto
 rovia status
 rovia speed-test
+rovia diagnose
 rovia disconnect
 ```
 
@@ -97,17 +101,24 @@ Build and launch the lightweight desktop shell after building the solution:
 dotnet run --project src/Rovia.Desktop --configuration Release
 ```
 
-The desktop application can import VLESS links, display persisted nodes, start
-automatic routing, inspect runtime status, and disconnect. It delegates parsing
-and state to the existing libraries and controls the same runtime host as the CLI.
+The desktop application can import links, display persisted nodes, start automatic
+routing, inspect runtime status, run speed tests and diagnostics, select system-
+proxy or TUN mode, and disconnect. It also imports HTTP subscription URLs containing
+VLESS, Trojan, VMess, and Shadowsocks entries. It delegates parsing and state to the
+existing libraries and controls the same runtime host as the CLI.
 
 ## Current status
 
-Rovia is a functional Core, runtime, CLI, and Desktop prototype. VLESS through sing-box is the only
-implemented protocol/backend combination. Health checks currently measure TCP
+Rovia is a functional Core, runtime, CLI, and Desktop prototype. sing-box supports
+the implemented VLESS, Trojan, VMess, and Shadowsocks models. Health checks measure TCP
 reachability for ranking, while connection activation separately verifies HTTP
 egress. The runtime monitors routes every 30 seconds and applies policy-controlled
 switching; it is not yet installed as an operating-system service.
+
+TUN configuration is opt-in and validated against sing-box, but requires an
+elevated Windows process for real traffic capture. Mobile platform VPN bridges,
+Xray backend support, Hysteria2/TUIC parsing, encrypted credential storage, and
+subscription scheduling remain future milestones.
 
 Credentials are stored in the local node file because sing-box requires them, but
 Rovia never includes them in node display strings, normal CLI output, or scoring
