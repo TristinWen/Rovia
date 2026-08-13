@@ -72,6 +72,7 @@ rovia connect-auto
 rovia status
 rovia speed-test
 rovia diagnose
+rovia export-diagnostics [output.zip]
 rovia disconnect
 ```
 
@@ -120,12 +121,12 @@ switching; it is not yet installed as an operating-system service.
 
 TUN configuration is opt-in and validated against sing-box, but requires an
 elevated Windows process for real traffic capture. Mobile platform VPN bridges,
-Xray backend support, Hysteria2/TUIC parsing, encrypted credential storage, and
-subscription scheduling remain future milestones.
+Xray backend support, Hysteria2/TUIC parsing, and subscription scheduling remain
+future milestones.
 
-Credentials are stored in the local node file because sing-box requires them, but
-Rovia never includes them in node display strings, normal CLI output, or scoring
-diagnostics. Protect the local state directory as sensitive data.
+Credentials are encrypted in the local node file with Windows DPAPI for the
+current user. Rovia never includes them in node display strings, normal CLI output,
+scoring diagnostics, or support ZIP exports.
 
 ## Non-goals
 

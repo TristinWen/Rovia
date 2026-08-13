@@ -30,7 +30,8 @@ Implemented and validated:
   Avalonia Desktop, and test projects.
 - VLESS, Trojan, VMess, and SIP002 Shadowsocks link parsing.
 - Plain-text and Base64 HTTP subscription import with stable deduplication.
-- Atomic JSON node persistence.
+- Atomic JSON node persistence with current-user Windows DPAPI credential encryption
+  and automatic plaintext migration.
 - Deterministic sing-box configuration and managed binary provisioning.
 - TCP health samples, rolling success/failure metrics, stability-first scoring,
   deterministic ranking, hysteresis, and explicit failover state.
@@ -38,6 +39,10 @@ Implemented and validated:
   and bounded quick download throughput measurements.
 - Cross-process runtime status, speed-test, diagnostics, and clean disconnect.
 - Windows system-proxy snapshot and restoration.
+- Startup preflight for occupied proxy ports plus interrupted-session recovery for
+  orphaned sing-box processes and pending system-proxy snapshots.
+- Bounded structured JSONL runtime logs and redacted support ZIP export from CLI
+  or Desktop.
 - Opt-in sing-box TUN configuration with strict automatic routes.
 - Desktop controls for links, subscriptions, nodes, traffic mode, diagnostics,
   speed testing, connection, and disconnection.
@@ -49,7 +54,7 @@ Last known validation baseline:
 dotnet build Rovia.sln --configuration Release
 dotnet test Rovia.sln --configuration Release --no-build
 
-28 tests passed
+33 tests passed
 0 build warnings
 0 build errors
 ```
@@ -82,9 +87,11 @@ Goal: make the current prototype safe for daily use.
 - Recover sing-box, routes, and system proxy after crashes, sleep, resume, and
   network-interface changes.
 - Validate real TUN connection under elevation and implement explicit route cleanup.
-- Detect elevation, port conflicts, stale TUN interfaces, and backend early exits.
-- Add structured rotating logs and a redacted diagnostic export.
-- Encrypt node credentials with Windows DPAPI and restrict local file permissions.
+- Detect elevation, stale TUN interfaces, and backend early exits. Port-conflict
+  detection is implemented.
+- Structured rotating logs and redacted diagnostic export are implemented.
+- Windows DPAPI credential encryption and plaintext migration are implemented;
+  explicit local ACL hardening remains.
 - Add Desktop system tray, close behavior, startup option, and update notifications.
 
 Definition of done:
@@ -180,7 +187,8 @@ native service/extension must continue when the Unity UI process is suspended.
   sing-box configuration.
 - Only sing-box is implemented as a backend.
 - Hysteria2 and TUIC enum values exist but their parsers/adapters do not.
-- Credential storage is plain local JSON and must be treated as sensitive.
+- Credentials are protected with current-user Windows DPAPI. Non-credential node
+  metadata remains readable JSON, and explicit file ACL hardening remains planned.
 - Desktop has no tray integration, installer, updater, localization, or accessibility
   validation.
 - Android and iOS projects do not exist yet.
