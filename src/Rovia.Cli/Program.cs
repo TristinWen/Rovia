@@ -109,6 +109,9 @@ internal static class RoviaCli
         using Mutex runtimeMutex = new(false, $"Rovia.Runtime.{Environment.UserName}", out bool ownsRuntime);
         if (!ownsRuntime)
             throw new InvalidOperationException("Another Rovia runtime is already connected or connecting.");
+        RecoverInterruptedRuntime(dataDirectory);
+        SingBoxOptions requestedOptions = CreateOptions(dataDirectory);
+        RuntimePreflight.EnsurePortAvailable(requestedOptions.ListenPort);
         string singBoxPath = await new SingBoxProvisioner().EnsureAsync(dataDirectory);
         await using AdaptiveRouteEngine engine = CreateEngine(repository, dataDirectory, singBoxPath);
         ProxyNode node = automatic
@@ -133,7 +136,7 @@ internal static class RoviaCli
         Console.CancelKeyPress += (_, eventArgs) => { eventArgs.Cancel = true; exit.Cancel(); };
         RuntimeState State() => new()
         {
-            IsRunning = !exit.IsCancellationRequested, ProcessId = Environment.ProcessId, NodeId = engine.CurrentNode?.Id,
+            IsRunning = !exit.IsCancellationRequested, ProcessId = Environment.ProcessId, BackendProcessId = status.ProcessId, NodeId = engine.CurrentNode?.Id,
             NodeName = engine.CurrentNode is null ? null : DisplayName(engine.CurrentNode), LocalEndpoint = status.LocalEndpoint?.ToString(),
             FailoverState = engine.FailoverState, StartedAt = startedAt, UpdatedAt = DateTimeOffset.UtcNow,
             LastMessage = performance?.Message ?? (egress.Success ? $"Egress verified in {egress.Duration.TotalMilliseconds:0} ms." : egress.Message),
@@ -221,6 +224,21 @@ internal static class RoviaCli
         string json = new SingBoxConfigBuilder().Build(node, CreateOptions(dataDirectory));
         Console.WriteLine(json);
         return 0;
+    }
+
+    private static void RecoverInterruptedRuntime(string dataDirectory)
+    {
+        string statePath    = Path.Combine(dataDirectory, "runtime-state.json");
+        string snapshotPath = Path.Combine(dataDirectory, "system-proxy.json");
+        RuntimeStateStore store = new(statePath);
+        RuntimeState? stale     = store.Read();
+        if (stale is { IsRunning: false })
+        {
+            bool backendStopped = RuntimePreflight.StopOrphanedBackend(stale);
+            bool proxyRestored  = OperatingSystem.IsWindows() && SystemProxyLease.RestorePending(new WindowsSystemProxySettings(), snapshotPath);
+            if (backendStopped || proxyRestored)
+                store.Write(stale with { UpdatedAt = DateTimeOffset.UtcNow, LastMessage = "Recovered resources left by an interrupted runtime." });
+        }
     }
 
     private static AdaptiveRouteEngine CreateEngine(JsonNodeRepository repository, string dataDirectory, string? singBoxPath = null)
