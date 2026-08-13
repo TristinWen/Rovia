@@ -11,6 +11,7 @@ using Rovia.Core.Routing;
 using Rovia.Platform.Windows.Proxy;
 using Rovia.Platform.Windows.Security;
 using Rovia.Runtime.Monitoring;
+using Rovia.Runtime.Diagnostics;
 using Rovia.Runtime.Runtime;
 
 return await RoviaCli.RunAsync(args);
@@ -44,6 +45,7 @@ internal static class RoviaCli
                 "disconnect"   => await DisconnectAsync(dataDirectory),
                 "speed-test"   => await SpeedTestAsync(dataDirectory),
                 "diagnose"     => await DiagnoseAsync(dataDirectory),
+                "export-diagnostics" => ExportDiagnostics(args, dataDirectory),
                 "check-config" => CheckConfig(args, repository, dataDirectory),
                 _              => Unknown(args[0])
             };
@@ -109,6 +111,7 @@ internal static class RoviaCli
         using Mutex runtimeMutex = new(false, $"Rovia.Runtime.{Environment.UserName}", out bool ownsRuntime);
         if (!ownsRuntime)
             throw new InvalidOperationException("Another Rovia runtime is already connected or connecting.");
+        RuntimeLog log = new(Path.Combine(dataDirectory, "logs"));
         RecoverInterruptedRuntime(dataDirectory);
         SingBoxOptions requestedOptions = CreateOptions(dataDirectory);
         RuntimePreflight.EnsurePortAvailable(requestedOptions.ListenPort);
@@ -157,11 +160,13 @@ internal static class RoviaCli
             ? SystemProxyLease.Activate(new WindowsSystemProxySettings(), snapshotPath, $"127.0.0.1:{activeOptions.ListenPort}")
             : null;
         Console.WriteLine($"connected {DisplayName(node)} via {status.LocalEndpoint}; egress verified");
+        log.Write("Information", "runtime.connected", $"Connected node {node.Id} on local port {activeOptions.ListenPort}.");
         Console.WriteLine("Use 'rovia disconnect' or press Ctrl+C to disconnect.");
         try { await Task.Delay(Timeout.InfiniteTimeSpan, exit.Token); } catch (OperationCanceledException) { }
         proxyLease?.Dispose();
         await engine.DisconnectAsync();
         stateStore.Write(State() with { IsRunning = false, LastMessage = "Disconnected cleanly." });
+        log.Write("Information", "runtime.disconnected", "Disconnected cleanly and restored platform settings.");
         try { await Task.WhenAll(serverTask, monitorTask); } catch (OperationCanceledException) { }
         return 0;
     }
@@ -226,6 +231,15 @@ internal static class RoviaCli
         return 0;
     }
 
+    private static int ExportDiagnostics(string[] args, string dataDirectory)
+    {
+        string destination = args.Length >= 2
+            ? args[1]
+            : Path.Combine(Environment.CurrentDirectory, $"rovia-diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+        Console.WriteLine(DiagnosticExporter.Export(dataDirectory, destination));
+        return 0;
+    }
+
     private static void RecoverInterruptedRuntime(string dataDirectory)
     {
         string statePath    = Path.Combine(dataDirectory, "runtime-state.json");
@@ -277,6 +291,7 @@ internal static class RoviaCli
           rovia disconnect
           rovia speed-test
           rovia diagnose
+          rovia export-diagnostics [output.zip]
 
         Environment:
           ROVIA_DATA_DIR     Local state directory
