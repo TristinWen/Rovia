@@ -6,6 +6,7 @@ using Rovia.Config.Parsing;
 using Rovia.Config.Storage;
 using Rovia.Config.Subscriptions;
 using Rovia.Core.Models;
+using Rovia.Platform.Windows.Security;
 using Rovia.Runtime.Runtime;
 
 namespace Rovia.Desktop;
@@ -21,7 +22,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        _repository          = new(Path.Combine(_dataDirectory, "nodes.json"));
+        _repository          = new(Path.Combine(_dataDirectory, "nodes.json"), new WindowsCredentialProtector());
         NodeList.ItemsSource = _nodes;
         ReloadNodes();
         Opened += async (_, _) => await RefreshStatusAsync();

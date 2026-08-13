@@ -9,6 +9,7 @@ using Rovia.Core.Models;
 using Rovia.Core.Policies;
 using Rovia.Core.Routing;
 using Rovia.Platform.Windows.Proxy;
+using Rovia.Platform.Windows.Security;
 using Rovia.Runtime.Monitoring;
 using Rovia.Runtime.Runtime;
 
@@ -27,7 +28,7 @@ internal static class RoviaCli
 
         string dataDirectory = Environment.GetEnvironmentVariable("ROVIA_DATA_DIR")
             ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Rovia");
-        JsonNodeRepository repository = new(Path.Combine(dataDirectory, "nodes.json"));
+        JsonNodeRepository repository = new(Path.Combine(dataDirectory, "nodes.json"), new WindowsCredentialProtector());
         try
         {
             return args[0].ToLowerInvariant() switch
