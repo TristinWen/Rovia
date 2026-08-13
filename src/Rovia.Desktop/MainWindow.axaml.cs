@@ -161,6 +161,13 @@ public partial class MainWindow : Window
 
     private async void DiagnoseClicked(object? sender, RoutedEventArgs eventArgs) => await RunCliCommandAsync("diagnose", "Running DNS and egress diagnostics…");
 
+    private async void ExportDiagnosticsClicked(object? sender, RoutedEventArgs eventArgs)
+    {
+        string desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+        string output  = Path.Combine(desktop, $"rovia-diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.zip");
+        await RunCliCommandAsync($"export-diagnostics \"{output}\"", "Creating a redacted support archive...");
+    }
+
     private async Task RunCliCommandAsync(string command, string progress)
     {
         try

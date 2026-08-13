@@ -57,15 +57,16 @@
       </Border>
     </Grid>
 
-    <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" Margin="0,16,0,0">
-      <Button Content="Connect best" Click="ConnectBestClicked" Margin="0,0,8,0" />
-      <Button Grid.Column="1" Content="Connect selected" Click="ConnectSelectedClicked" />
+    <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" Margin="0,16,0,0">
+      <Button Content="Connect" Click="ConnectBestClicked" Margin="0,0,8,0" />
+      <Button Grid.Column="1" Content="Connect selected" Click="ConnectSelectedClicked" ToolTip.Tip="Connect the node selected in the list" />
       <Button Grid.Column="2" Content="Disconnect" Click="DisconnectClicked" Margin="8,0,0,0" />
       <Button Grid.Column="3" Content="Delete selected" Click="DeleteClicked" Margin="8,0,0,0" />
       <Button Grid.Column="4" Content="Probe all" Click="ProbeClicked" Margin="8,0,0,0" />
       <Button Grid.Column="5" Content="Diagnose" Click="DiagnoseClicked" Margin="8,0,0,0" />
-      <TextBlock x:Name="MessageText" Grid.Column="6" Margin="16,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-      <TextBlock Grid.Column="7" Text="Local proxy 127.0.0.1:2080" VerticalAlignment="Center" Opacity="0.55" />
+      <Button Grid.Column="6" Content="Export support ZIP" Click="ExportDiagnosticsClicked" Margin="8,0,0,0" />
+      <TextBlock x:Name="MessageText" Grid.Column="7" Margin="16,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      <TextBlock Grid.Column="8" Text="Local proxy 127.0.0.1:2080" VerticalAlignment="Center" Opacity="0.55" />
     </Grid>
   </Grid>
 </Window>
