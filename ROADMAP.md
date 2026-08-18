@@ -62,6 +62,29 @@ dotnet test Rovia.sln --configuration Release --no-build
 The existing real VLESS node is stored outside Git under `%LOCALAPPDATA%\Rovia`.
 Credentials and generated binaries must never be committed.
 
+## Active handoff
+
+Current focus: **P0 — Windows reliability**. The repository is ready to continue
+from the durable background-host milestone; no local feature work is pending.
+
+Recommended next development slice:
+
+1. Define a versioned runtime-host contract and lifecycle states without moving
+   platform behavior into Core.
+2. Add a durable Windows background host that owns sing-box independently of the
+   CLI and Desktop processes.
+3. Reuse the existing runtime control, state, preflight, recovery, logging, and
+   diagnostic components from that host.
+4. Add lifecycle tests for start, duplicate start, clean stop, backend early exit,
+   and recovery after an unclean host termination.
+5. Update CLI and Desktop launch/control paths only after the host contract and
+   lifecycle tests are stable.
+
+After that slice, continue P0 with sleep/resume and network-interface recovery,
+elevated real-TUN validation and cleanup, local ACL hardening, and Desktop tray /
+startup behavior. P1 subscription persistence and scheduling should begin only
+after the durable host owns runtime lifecycle reliably.
+
 ## Architecture constraints
 
 - `Rovia.Core` must not reference Config, Backends, Runtime, Desktop, or platform APIs.
