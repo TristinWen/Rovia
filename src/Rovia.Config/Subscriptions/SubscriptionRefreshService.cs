@@ -29,7 +29,11 @@ public sealed class SubscriptionRefreshService(
         List<SubscriptionImportResult> results = [];
         foreach (SubscriptionDefinition definition in subscriptions.GetAll().Where(item => item.Enabled &&
                      (item.LastRefreshedAt is null || now - item.LastRefreshedAt >= item.RefreshInterval)))
-            results.Add(await RefreshAsync(definition, cancellationToken));
+        {
+            try { results.Add(await RefreshAsync(definition, cancellationToken)); }
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested &&
+                                               exception is (HttpRequestException or IOException or TaskCanceledException)) { }
+        }
         return results;
     }
 }

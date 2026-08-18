@@ -8,12 +8,12 @@ public sealed class AdaptiveRouteMonitor(
     AdaptiveRouteEngine engine,
     RouteHistoryStore history,
     TimeSpan interval,
-    HealthHistoryStore? healthHistory = null)
+    HealthHistoryStore? healthHistory = null,
+    RouteEvaluationSignal? evaluationSignal = null)
 {
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
-        using PeriodicTimer timer = new(interval);
-        do
+        while (!cancellationToken.IsCancellationRequested)
         {
             ProxyNode? previous = engine.CurrentNode;
             ProxyNode? selected = await engine.SelectBestRouteAsync(cancellationToken);
@@ -25,7 +25,10 @@ public sealed class AdaptiveRouteMonitor(
                     ?? (previous is null ? "Initial selection." : $"Automatic switch from {previous.Id}.");
                 history.Append(new(DateTimeOffset.UtcNow, previous?.Id, selected.Id, reason));
             }
+            if (evaluationSignal is null)
+                await Task.Delay(interval, cancellationToken);
+            else
+                await evaluationSignal.WaitAsync(interval, cancellationToken);
         }
-        while (await timer.WaitForNextTickAsync(cancellationToken));
     }
 }

@@ -34,6 +34,8 @@ Implemented and validated:
   replacement, and preservation of user-edited node labels.
 - Cross-process node-repository reload and serialized writers so a detached host
   observes Desktop/CLI imports and provider refreshes without lost updates.
+- Provider-isolated scheduled refresh and immediate route re-evaluation after
+  network address or availability changes.
 - Atomic JSON node persistence with current-user Windows DPAPI credential encryption
   and automatic plaintext migration.
 - Deterministic sing-box configuration and managed binary provisioning.
@@ -80,15 +82,15 @@ implemented; Windows startup registration and operating-system event recovery re
 Recommended next development slice:
 
 1. Register the detached host as an optional per-user Windows startup task.
-2. React to sleep/resume and network-interface changes by revalidating backend
-   egress and selecting a healthy route.
+2. Add explicit Windows sleep/resume notification handling; network-interface and
+   availability changes already trigger immediate health re-evaluation.
 3. Add integration coverage for duplicate start, clean stop, and unclean process
    recovery around a controllable fake backend.
 
-After that slice, continue P0 with sleep/resume and network-interface recovery,
-elevated real-TUN validation and cleanup, local ACL hardening, and Desktop tray /
-startup behavior. P1 subscription persistence and scheduling should begin only
-after the durable host owns runtime lifecycle reliably.
+After that slice, continue P0 with elevated real-TUN validation and cleanup, local
+ACL hardening, and Desktop tray/startup behavior. Continue P1 with node groups and
+pinned routes; subscription persistence, scheduling, routing/DNS mapping, and
+explainable health history are implemented.
 
 ## Architecture constraints
 
@@ -112,8 +114,8 @@ Goal: make the current prototype safe for daily use.
 
 - Detached background ownership is implemented; optional per-user startup
   registration remains instead of requiring an elevated system service.
-- Recover sing-box, routes, and system proxy after crashes, sleep, resume, and
-  network-interface changes.
+- Crash recovery and immediate network-interface re-evaluation are implemented;
+  explicit sleep/resume notification handling remains.
 - Validate real TUN connection under elevation and implement explicit route cleanup.
 - Detect elevation, stale TUN interfaces, and backend early exits. Port-conflict
   detection is implemented.

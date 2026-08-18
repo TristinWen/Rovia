@@ -62,6 +62,34 @@ public sealed class SubscriptionRefreshServiceTests
         }
     }
 
+    [Fact]
+    public async Task RefreshDueAsync_ContinuesAfterProviderFailure()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            JsonSubscriptionStore definitions = new(Path.Combine(directory, "subscriptions.json"));
+            definitions.Upsert(new() { Id = "broken", Name = "Broken", Source = new("https://example.com/broken") });
+            definitions.Upsert(new() { Id = "healthy", Name = "Healthy", Source = new("https://example.com/healthy") });
+            HttpClient client = new(new RoutingHandler(request => request.RequestUri!.AbsolutePath == "/broken"
+                ? Task.FromException<HttpResponseMessage>(new HttpRequestException("offline"))
+                : Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls#First")
+                })));
+            SubscriptionRefreshService service = new(definitions, new(Path.Combine(directory, "nodes.json")),
+                new([new VlessLinkParser()], client));
+
+            Assert.Single(await service.RefreshDueAsync(DateTimeOffset.UtcNow));
+            Assert.Equal("offline", definitions.GetAll().Single(item => item.Id == "broken").LastError);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, true);
+        }
+    }
+
     private static SubscriptionImporter CreateImporter(string content) => new([new VlessLinkParser()],
         new HttpClient(new StubHandler(content)));
 
@@ -69,5 +97,10 @@ public sealed class SubscriptionRefreshServiceTests
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(content) });
+    }
+
+    private sealed class RoutingHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> response) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => response(request);
     }
 }

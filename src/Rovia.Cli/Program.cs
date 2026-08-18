@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Reflection;
+using System.Net.NetworkInformation;
 using Rovia.Backends.SingBox;
 using Rovia.Config.Parsing;
 using Rovia.Config.Storage;
@@ -283,8 +284,9 @@ internal static class RoviaCli
         }
         RuntimeControlServer server = new(pipeName, State, exit.Cancel, MeasurePerformance);
         Task serverTask             = server.RunAsync(exit.Token);
+        RouteEvaluationSignal evaluationSignal = new();
         AdaptiveRouteMonitor monitor = new(engine, new RouteHistoryStore(historyPath), TimeSpan.FromSeconds(30),
-            new HealthHistoryStore(Path.Combine(dataDirectory, "health-history.json")));
+            new HealthHistoryStore(Path.Combine(dataDirectory, "health-history.json")), evaluationSignal);
         Task monitorTask             = automatic ? monitor.RunAsync(exit.Token) : Task.CompletedTask;
         Task subscriptionTask        = automatic ? RefreshSubscriptionsPeriodicallyAsync(repository, dataDirectory, log, exit.Token) : Task.CompletedTask;
         RuntimeLifetimeSupervisor supervisor = new(engine.GetStatusAsync, TimeSpan.FromSeconds(2));
@@ -300,7 +302,17 @@ internal static class RoviaCli
             ? SystemProxyLease.Activate(new WindowsSystemProxySettings(), snapshotPath, $"127.0.0.1:{activeOptions.ListenPort}")
             : null;
         log.Write("Information", "runtime.connected", $"Connected node {node.Id} on local port {activeOptions.ListenPort}.");
-        try { await Task.Delay(Timeout.InfiniteTimeSpan, exit.Token); } catch (OperationCanceledException) { }
+        NetworkAddressChangedEventHandler addressChanged = (_, _) => evaluationSignal.Pulse();
+        NetworkAvailabilityChangedEventHandler availabilityChanged = (_, _) => evaluationSignal.Pulse();
+        NetworkChange.NetworkAddressChanged  += addressChanged;
+        NetworkChange.NetworkAvailabilityChanged += availabilityChanged;
+        try { await Task.Delay(Timeout.InfiniteTimeSpan, exit.Token); }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            NetworkChange.NetworkAddressChanged  -= addressChanged;
+            NetworkChange.NetworkAvailabilityChanged -= availabilityChanged;
+        }
         proxyLease?.Dispose();
         await engine.DisconnectAsync();
         stateStore.Write(State() with { IsRunning = false, LastMessage = "Disconnected cleanly." });

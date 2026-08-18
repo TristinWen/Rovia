@@ -156,7 +156,9 @@ the implemented VLESS, Trojan, VMess, and Shadowsocks models. Health checks meas
 reachability for ranking, while connection activation separately verifies HTTP
 egress. The detached runtime host monitors routes every 30 seconds, refreshes due
 subscriptions, detects repeated backend exits, and applies policy-controlled
-switching. It is not yet registered as an operating-system service or startup task.
+switching. Network address/availability changes trigger immediate re-evaluation,
+and one unavailable provider does not block other due subscription refreshes. The
+host is not yet registered as an operating-system service or startup task.
 
 TUN configuration is opt-in and validated against sing-box, but requires an
 elevated Windows process for real traffic capture. Mobile platform VPN bridges,
