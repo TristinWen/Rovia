@@ -42,6 +42,8 @@ Implemented and validated:
 - Cross-process runtime status, speed-test, diagnostics, and clean disconnect.
 - Detached runtime ownership independent of the invoking CLI/Desktop, repeated
   backend-exit supervision, and scheduled due-provider refresh.
+- Bounded atomic health history and route decisions explaining emergency failover,
+  hysteresis holds, score improvements, and active switching thresholds.
 - Windows system-proxy snapshot and restoration.
 - Startup preflight for occupied proxy ports plus interrupted-session recovery for
   orphaned sing-box processes and pending system-proxy snapshots.
@@ -139,7 +141,7 @@ Goal: make adaptive routing useful with real multi-node subscriptions.
   sing-box route and DNS configuration. Desktop rule editing remains optional UI.
 - Add regional/node groups, pinned routes, exclusions, and application policies.
 - Feed passive backend failures into node health instead of relying only on probes.
-- Store bounded health history and expose route-switch reasons in Desktop.
+- Bounded health history, CLI inspection, and Desktop route-switch reasons are implemented.
 
 Definition of done:
 

@@ -21,6 +21,7 @@ public sealed class AdaptiveRouteEngine(
 
     public ProxyNode? CurrentNode { get; private set; }
     public FailoverState FailoverState => failover.State;
+    public RouteSelectionDecision? LastSelectionDecision { get; private set; }
     public event EventHandler<RouteChangedEventArgs>? RouteChanged;
 
     public void AddNode(ProxyNode node) => repository.Add(node);
@@ -51,7 +52,8 @@ public sealed class AdaptiveRouteEngine(
     public async Task<ProxyNode?> SelectBestRouteAsync(CancellationToken cancellationToken = default)
     {
         IReadOnlyList<RouteScore> scores = await RankAsync(cancellationToken);
-        RouteScore? selected             = selector.Select(scores, _health, policy, DateTimeOffset.UtcNow);
+        LastSelectionDecision            = selector.Decide(scores, _health, policy, DateTimeOffset.UtcNow);
+        RouteScore? selected             = LastSelectionDecision.Selected;
         return selected is null ? null : repository.Get(selected.NodeId);
     }
 

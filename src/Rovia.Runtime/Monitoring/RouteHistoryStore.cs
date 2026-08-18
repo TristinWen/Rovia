@@ -18,6 +18,8 @@ public sealed class RouteHistoryStore(string path, int maximumEntries = 100)
             records.RemoveRange(0, records.Count - maximumEntries);
         string fullPath = Path.GetFullPath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
-        File.WriteAllText(fullPath, JsonSerializer.Serialize(records, JsonOptions));
+        string temporaryPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
+        File.WriteAllText(temporaryPath, JsonSerializer.Serialize(records, JsonOptions));
+        File.Move(temporaryPath, fullPath, true);
     }
 }

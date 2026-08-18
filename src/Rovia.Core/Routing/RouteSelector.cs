@@ -11,25 +11,32 @@ public sealed class RouteSelector
     private DateTimeOffset _lastSwitchAt;
 
     public RouteScore? Select(IReadOnlyList<RouteScore> scores, IReadOnlyDictionary<string, NodeHealth> health,
+        RoutingPolicy policy, DateTimeOffset now) => Decide(scores, health, policy, now).Selected;
+
+    public RouteSelectionDecision Decide(IReadOnlyList<RouteScore> scores, IReadOnlyDictionary<string, NodeHealth> health,
         RoutingPolicy policy, DateTimeOffset now)
     {
         RouteScore? best = scores.OrderByDescending(score => score.Value).ThenBy(score => score.NodeId, StringComparer.Ordinal).FirstOrDefault();
         if (best is null)
-            return null;
+            return new(null, false, "No route candidates are available.");
         if (_currentNodeId is null)
-            return Set(best, now);
+            return new(Set(best, now), true, $"Initial selection: {best.NodeId} scored {best.Value:0.0}. {best.Reason}");
 
         RouteScore? current = scores.FirstOrDefault(score => score.NodeId == _currentNodeId);
-        bool failed = current is null || !health.TryGetValue(_currentNodeId, out NodeHealth? currentHealth)
-                      || currentHealth.State == NodeHealthState.Offline
-                      || currentHealth.ConsecutiveFailures >= policy.FailureThreshold;
-        if (failed)
-            return Set(best, now);
+        if (current is null || !health.TryGetValue(_currentNodeId, out NodeHealth? currentHealth))
+            return new(Set(best, now), true, $"Emergency switch: current route {_currentNodeId} has no health evidence; selected {best.NodeId} ({best.Value:0.0}).");
+        if (currentHealth.State == NodeHealthState.Offline || currentHealth.ConsecutiveFailures >= policy.FailureThreshold)
+            return new(Set(best, now), true, $"Emergency switch: {_currentNodeId} is {currentHealth.State} with {currentHealth.ConsecutiveFailures} consecutive failures; selected {best.NodeId} ({best.Value:0.0}).");
         if (best.NodeId == current!.NodeId)
-            return current;
-        if (now - _selectedAt < policy.MinimumRouteLifetime || now - _lastSwitchAt < policy.SwitchCooldown)
-            return current;
-        return best.Value - current.Value >= policy.MinimumImprovement ? Set(best, now) : current;
+            return new(current, false, $"Kept {current.NodeId}: it remains highest-ranked at {current.Value:0.0}.");
+        if (now - _selectedAt < policy.MinimumRouteLifetime)
+            return new(current, false, $"Kept {current.NodeId}: minimum route lifetime of {policy.MinimumRouteLifetime.TotalSeconds:0}s has not elapsed.");
+        if (now - _lastSwitchAt < policy.SwitchCooldown)
+            return new(current, false, $"Kept {current.NodeId}: switch cooldown of {policy.SwitchCooldown.TotalSeconds:0}s has not elapsed.");
+        double improvement = best.Value - current.Value;
+        return improvement >= policy.MinimumImprovement
+            ? new(Set(best, now), true, $"Optimization switch: {best.NodeId} improves score by {improvement:0.0} (required {policy.MinimumImprovement:0.0}). {best.Reason}")
+            : new(current, false, $"Kept {current.NodeId}: {best.NodeId} improves score by only {improvement:0.0} (required {policy.MinimumImprovement:0.0}).");
     }
 
     private RouteScore Set(RouteScore score, DateTimeOffset now)

@@ -55,6 +55,7 @@ internal static class RoviaCli
                 "disconnect"   => await DisconnectAsync(dataDirectory),
                 "speed-test"   => await SpeedTestAsync(dataDirectory),
                 "diagnose"     => await DiagnoseAsync(dataDirectory),
+                "history"      => ShowHistory(dataDirectory),
                 "export-diagnostics" => ExportDiagnostics(args, dataDirectory),
                 "check-config" => CheckConfig(args, repository, dataDirectory),
                 _              => Unknown(args[0])
@@ -266,6 +267,14 @@ internal static class RoviaCli
             LastMessage = performance?.Message ?? runtimeMessage,
             ProxyLatencyMs = performance?.LatencyMs, DownloadMbps = performance?.DownloadMbps, PerformanceAt = performance?.MeasuredAt
         };
+        engine.RouteChanged += (_, eventArgs) =>
+        {
+            if (engine.LastSelectionDecision?.Reason is not { } reason)
+                return;
+            runtimeMessage = reason;
+            stateStore.Write(State());
+            log.Write("Information", "route.changed", $"{eventArgs.Previous?.Id ?? "none"} -> {eventArgs.Current.Id}: {reason}");
+        };
         stateStore.Write(State());
         async Task MeasurePerformance(CancellationToken token)
         {
@@ -274,7 +283,8 @@ internal static class RoviaCli
         }
         RuntimeControlServer server = new(pipeName, State, exit.Cancel, MeasurePerformance);
         Task serverTask             = server.RunAsync(exit.Token);
-        AdaptiveRouteMonitor monitor = new(engine, new RouteHistoryStore(historyPath), TimeSpan.FromSeconds(30));
+        AdaptiveRouteMonitor monitor = new(engine, new RouteHistoryStore(historyPath), TimeSpan.FromSeconds(30),
+            new HealthHistoryStore(Path.Combine(dataDirectory, "health-history.json")));
         Task monitorTask             = automatic ? monitor.RunAsync(exit.Token) : Task.CompletedTask;
         Task subscriptionTask        = automatic ? RefreshSubscriptionsPeriodicallyAsync(repository, dataDirectory, log, exit.Token) : Task.CompletedTask;
         RuntimeLifetimeSupervisor supervisor = new(engine.GetStatusAsync, TimeSpan.FromSeconds(2));
@@ -361,6 +371,15 @@ internal static class RoviaCli
         foreach (DiagnosticTargetResult result in results)
             Console.WriteLine($"{result.Target.Host}\tdns={(result.DnsResolved ? "ok" : "failed")}\tegress={(result.Egress.Success ? "ok" : result.Egress.FailureKind.ToString().ToLowerInvariant())}\t{result.Egress.Duration.TotalMilliseconds:0} ms");
         return results.Any(result => result.Egress.Success) ? 0 : 2;
+    }
+
+    private static int ShowHistory(string dataDirectory)
+    {
+        foreach (RouteChangeRecord record in new RouteHistoryStore(Path.Combine(dataDirectory, "route-history.json")).Read().TakeLast(20))
+            Console.WriteLine($"route\t{record.At:O}\t{record.PreviousNodeId ?? "-"}\t{record.CurrentNodeId}\t{record.Reason}");
+        foreach (NodeHealth sample in new HealthHistoryStore(Path.Combine(dataDirectory, "health-history.json")).Read().TakeLast(20))
+            Console.WriteLine($"health\t{sample.LastCheckedAt:O}\t{sample.NodeId}\t{sample.State}\tlatency={FormatMetric(sample.LatencyMs, "ms")}\tsuccess={sample.SuccessRate:P0}\tfailures={sample.ConsecutiveFailures}");
+        return 0;
     }
 
     private static async Task<int> DisconnectAsync(string dataDirectory)
@@ -455,6 +474,7 @@ internal static class RoviaCli
           rovia disconnect
           rovia speed-test
           rovia diagnose
+          rovia history
           rovia export-diagnostics [output.zip]
 
         Environment:

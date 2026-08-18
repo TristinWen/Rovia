@@ -76,6 +76,7 @@ rovia connect-auto
 rovia status
 rovia speed-test
 rovia diagnose
+rovia history
 rovia export-diagnostics [output.zip]
 rovia disconnect
 ```
@@ -119,6 +120,11 @@ capturing all traffic.
 `speed-test` warms the proxy connection, reports the median of three application
 latency samples, and streams at most 512 KB for up to 3 seconds to estimate download throughput. It is
 manual by design so periodic route monitoring does not consume significant data.
+
+`history` shows the newest bounded health samples and route changes, including
+whether a switch was caused by failure or by a score improvement large enough to
+cross the configured hysteresis threshold. The same latest switch reason appears
+in Desktop runtime status.
 
 Rovia manages its own sing-box executable under `%LOCALAPPDATA%\Rovia\bin` on
 Windows. If the binary is missing, the next connection downloads the latest
