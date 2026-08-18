@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Rovia.Core.Models;
+using Rovia.Core.Policies;
 
 namespace Rovia.Backends.SingBox;
 
@@ -30,9 +31,66 @@ public sealed class SingBoxConfigBuilder
             ["log"] = new JsonObject { ["level"] = "info", ["timestamp"] = true },
             ["inbounds"] = BuildInbounds(options),
             ["outbounds"] = new JsonArray { outbound, new JsonObject { ["type"] = "direct", ["tag"] = "direct" } },
-            ["route"] = new JsonObject { ["final"] = "proxy" }
+            ["dns"] = BuildDns(options.DnsPolicy),
+            ["route"] = BuildRoute(options.RoutingRules)
         };
         return root.ToJsonString(JsonOptions);
+    }
+
+    private static JsonObject BuildDns(DnsPolicy policy)
+    {
+        JsonObject remote = new()
+        {
+            ["type"]        = policy.RemoteResolver.Scheme == "https" ? "https" : policy.RemoteResolver.Scheme,
+            ["tag"]         = "remote",
+            ["server"]      = policy.RemoteResolver.Host
+        };
+        if (!policy.RemoteResolver.IsDefaultPort)
+            remote["server_port"] = policy.RemoteResolver.Port;
+        if (policy.RemoteResolver.Scheme == "https")
+            remote["path"] = string.IsNullOrEmpty(policy.RemoteResolver.AbsolutePath) ? "/dns-query" : policy.RemoteResolver.AbsolutePath;
+        if (policy.ProxyRemoteQueries)
+            remote["detour"] = "proxy";
+        JsonObject local = policy.LocalResolver == "local"
+            ? new() { ["type"] = "local", ["tag"] = "local" }
+            : new() { ["type"] = "udp", ["tag"] = "local", ["server"] = policy.LocalResolver };
+        return new()
+        {
+            ["servers"]       = new JsonArray(remote, local),
+            ["final"]         = "remote",
+            ["strategy"]      = policy.PreferIpv6 ? "prefer_ipv6" : "prefer_ipv4",
+            ["disable_cache"] = !policy.EnableCache
+        };
+    }
+
+    private static JsonObject BuildRoute(IReadOnlyList<RoutingRule> rules)
+    {
+        JsonArray mapped = [];
+        foreach (RoutingRule rule in rules)
+        {
+            if (rule.Domains.Count + rule.DomainSuffixes.Count + rule.IpCidrs.Count + rule.ProcessNames.Count == 0)
+                throw new InvalidOperationException("A routing rule must contain at least one matcher.");
+            JsonObject result = new();
+            AddArray(result, "domain", rule.Domains);
+            AddArray(result, "domain_suffix", rule.DomainSuffixes);
+            AddArray(result, "ip_cidr", rule.IpCidrs);
+            AddArray(result, "process_name", rule.ProcessNames);
+            if (rule.Action == RouteAction.Block)
+                result["action"] = "reject";
+            else
+            {
+                result["action"]   = "route";
+                result["outbound"] = rule.Action == RouteAction.Direct ? "direct" : "proxy";
+            }
+            mapped.Add(result);
+        }
+        return new() { ["rules"] = mapped, ["final"] = "proxy" };
+    }
+
+    private static void AddArray(JsonObject target, string name, IReadOnlyList<string> values)
+    {
+        if (values.Count > 0)
+            target[name] = new JsonArray(values.Select(value => (JsonNode?)JsonValue.Create(value)).ToArray());
     }
 
     private static JsonArray BuildInbounds(SingBoxOptions options)

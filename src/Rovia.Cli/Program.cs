@@ -416,14 +416,20 @@ internal static class RoviaCli
             new FailoverEngine(), new SingBoxBackend(options, new SingBoxConfigBuilder()), new RoutingPolicy());
     }
 
-    private static SingBoxOptions CreateOptions(string dataDirectory, string? singBoxPath = null) => new()
+    private static SingBoxOptions CreateOptions(string dataDirectory, string? singBoxPath = null)
     {
-        ExecutablePath  = singBoxPath ?? Environment.GetEnvironmentVariable("ROVIA_SING_BOX") ?? "sing-box",
-        WorkingDirectory = Path.Combine(dataDirectory, "runtime"),
-        ListenPort       = int.TryParse(Environment.GetEnvironmentVariable("ROVIA_LISTEN_PORT"), out int port) ? port : 2080,
-        Mode             = Environment.GetEnvironmentVariable("ROVIA_MODE")?.Equals("tun", StringComparison.OrdinalIgnoreCase) == true
-            ? SingBoxConnectionMode.Tun : SingBoxConnectionMode.SystemProxy
-    };
+        RoutingConfiguration routing = new JsonRoutingConfigurationStore(Path.Combine(dataDirectory, "routing.json")).Read();
+        return new()
+        {
+            ExecutablePath   = singBoxPath ?? Environment.GetEnvironmentVariable("ROVIA_SING_BOX") ?? "sing-box",
+            WorkingDirectory = Path.Combine(dataDirectory, "runtime"),
+            ListenPort       = int.TryParse(Environment.GetEnvironmentVariable("ROVIA_LISTEN_PORT"), out int port) ? port : 2080,
+            Mode             = Environment.GetEnvironmentVariable("ROVIA_MODE")?.Equals("tun", StringComparison.OrdinalIgnoreCase) == true
+                ? SingBoxConnectionMode.Tun : SingBoxConnectionMode.SystemProxy,
+            RoutingRules     = routing.Rules,
+            DnsPolicy        = routing.Dns
+        };
+    }
 
     private static string DisplayName(ProxyNode node) => string.IsNullOrWhiteSpace(node.Name) ? node.Host : node.Name;
     private static string FormatMs(double? value) => value.HasValue ? $"{value:0.0} ms" : "unreachable";

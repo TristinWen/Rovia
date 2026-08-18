@@ -1,5 +1,7 @@
 namespace Rovia.Backends.SingBox;
 
+using Rovia.Core.Policies;
+
 /// <summary>Configures the sing-box executable and local mixed proxy endpoint.</summary>
 public sealed record SingBoxOptions
 {
@@ -9,4 +11,6 @@ public sealed record SingBoxOptions
     public int ListenPort { get; init; } = 2080;
     public SingBoxConnectionMode Mode { get; init; } = SingBoxConnectionMode.SystemProxy;
     public string TunStack { get; init; } = "mixed";
+    public IReadOnlyList<RoutingRule> RoutingRules { get; init; } = [];
+    public DnsPolicy DnsPolicy { get; init; } = new();
 }

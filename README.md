@@ -92,6 +92,30 @@ Set `ROVIA_MODE=tun` before connecting to enable transparent TUN capture. TUN
 normally requires an elevated Windows process and does not modify the Windows
 HTTP proxy. The default `system-proxy` mode remains safer for ordinary browsing.
 
+Optional routing and DNS policy lives in `%LOCALAPPDATA%\Rovia\routing.json` (or
+under `ROVIA_DATA_DIR`). Rules are evaluated in order and deterministically mapped
+to sing-box `route`, `direct`, or `reject` actions. For example:
+
+```json
+{
+  "Rules": [
+    { "DomainSuffixes": ["internal.example"], "Action": "Direct" },
+    { "Domains": ["tracker.example"], "Action": "Block" }
+  ],
+  "Dns": {
+    "RemoteResolver": "https://1.1.1.1/dns-query",
+    "LocalResolver": "local",
+    "ProxyRemoteQueries": true,
+    "PreferIpv6": false,
+    "EnableCache": true
+  }
+}
+```
+
+Remote DNS uses the selected proxy by default to prevent resolver traffic from
+bypassing the optimized route. A matcherless rule is rejected instead of silently
+capturing all traffic.
+
 `speed-test` warms the proxy connection, reports the median of three application
 latency samples, and streams at most 512 KB for up to 3 seconds to estimate download throughput. It is
 manual by design so periodic route monitoring does not consume significant data.

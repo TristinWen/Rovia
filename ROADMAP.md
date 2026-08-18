@@ -50,6 +50,8 @@ Implemented and validated:
 - Opt-in sing-box TUN configuration with strict automatic routes.
 - Desktop controls for links, subscriptions, nodes, traffic mode, diagnostics,
   speed testing, connection, and disconnection.
+- Persisted backend-independent routing/DNS policy with deterministic sing-box
+  domain, suffix, CIDR, process, direct, proxy, reject, and proxied-DNS mapping.
 - Self-contained Windows x64 publish output with a separate CLI runtime folder.
 
 Last known validation baseline:
@@ -133,8 +135,8 @@ Goal: make adaptive routing useful with real multi-node subscriptions.
 - User-edited node labels are preserved across refreshes; explicit pinned-route
   selections remain planned with node groups below.
 - Add Hysteria2 and TUIC parsers and sing-box mapping.
-- Implement routing-rule evaluation and map Core `RoutingRule`/`DnsPolicy` into
-  sing-box route and DNS configuration.
+- Core `RoutingRule`/`DnsPolicy` are persisted and mapped into deterministic
+  sing-box route and DNS configuration. Desktop rule editing remains optional UI.
 - Add regional/node groups, pinned routes, exclusions, and application policies.
 - Feed passive backend failures into node health instead of relying only on probes.
 - Store bounded health history and expose route-switch reasons in Desktop.
@@ -208,8 +210,8 @@ native service/extension must continue when the Unity UI process is suspended.
 - Runtime is a detached host independent of CLI/Desktop, but is not registered for
   per-user Windows startup and does not yet consume OS resume/network events.
 - Subscription providers, manual refresh, and background due refresh are persisted.
-- Routing rules and DNS policies exist as Core models but are not fully mapped into
-  sing-box configuration.
+- Routing/DNS policy is configured through `routing.json`; Desktop does not yet
+  provide a visual policy editor.
 - Only sing-box is implemented as a backend.
 - Hysteria2 and TUIC enum values exist but their parsers/adapters do not.
 - Credentials are protected with current-user Windows DPAPI. Non-credential node
