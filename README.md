@@ -64,6 +64,10 @@ dotnet test Rovia.sln --configuration Release
 rovia import "vless://..."
 rovia list
 rovia remove <node-id>
+rovia subscription-add <name> <url>
+rovia subscription-list
+rovia subscription-refresh [subscription-id]
+rovia subscription-remove <subscription-id>
 rovia probe
 rovia rank
 rovia check-config <node-id>
@@ -104,6 +108,9 @@ Build and launch the lightweight desktop shell after building the solution:
 ```text
 dotnet run --project src/Rovia.Desktop --configuration Release
 ```
+
+Subscription providers are persisted separately from nodes. Refresh atomically
+replaces only the selected provider's nodes while preserving stable node labels.
 
 The desktop application can import links, display persisted nodes, start automatic
 routing, inspect runtime status, run speed tests and diagnostics, select system-

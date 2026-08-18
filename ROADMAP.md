@@ -30,6 +30,8 @@ Implemented and validated:
   Avalonia Desktop, and test projects.
 - VLESS, Trojan, VMess, and SIP002 Shadowsocks link parsing.
 - Plain-text and Base64 HTTP subscription import with stable deduplication.
+- Persisted subscription definitions, manual atomic provider refresh, stable node
+  replacement, and preservation of user-edited node labels.
 - Atomic JSON node persistence with current-user Windows DPAPI credential encryption
   and automatic plaintext migration.
 - Deterministic sing-box configuration and managed binary provisioning.
@@ -128,9 +130,11 @@ Definition of done:
 
 Goal: make adaptive routing useful with real multi-node subscriptions.
 
-- Persist subscription definitions separately from imported nodes.
-- Add manual and scheduled subscription refresh with atomic provider replacement.
-- Preserve user labels and selections across refreshes.
+- Persist subscription definitions separately from imported nodes. Implemented.
+- Manual refresh with atomic provider replacement is implemented; invoke due
+  refresh automatically from the durable host after its lifecycle is established.
+- User-edited node labels are preserved across refreshes; explicit pinned-route
+  selections remain planned with node groups below.
 - Add Hysteria2 and TUIC parsers and sing-box mapping.
 - Implement routing-rule evaluation and map Core `RoutingRule`/`DnsPolicy` into
   sing-box route and DNS configuration.
@@ -205,7 +209,8 @@ native service/extension must continue when the Unity UI process is suspended.
 - Windows TUN configuration is generated and checked, but real elevated TUN traffic
   has not been accepted as a release-quality validated feature.
 - Runtime is a child CLI host, not an installed service.
-- Subscription URLs are imported manually and are not stored/scheduled as providers.
+- Subscription providers and manual refresh are persisted; background scheduling
+  awaits the durable runtime host.
 - Routing rules and DNS policies exist as Core models but are not fully mapped into
   sing-box configuration.
 - Only sing-box is implemented as a backend.

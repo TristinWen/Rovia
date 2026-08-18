@@ -40,6 +40,23 @@ public sealed class JsonNodeRepository : INodeRepository
         return removed;
     }
 
+    public void ReplaceSubscription(string source, IReadOnlyList<ProxyNode> nodes)
+    {
+        Dictionary<string, ProxyNode> existing = _nodes.Values
+            .Where(node => node.Metadata.GetValueOrDefault("subscriptionSource") == source)
+            .ToDictionary(node => node.Id, StringComparer.Ordinal);
+        foreach (string id in existing.Keys)
+            _nodes.Remove(id);
+        foreach (ProxyNode node in nodes)
+        {
+            ProxyNode replacement = existing.TryGetValue(node.Id, out ProxyNode? previous) && !string.IsNullOrWhiteSpace(previous.Name)
+                ? node with { Name = previous.Name }
+                : node;
+            _nodes[replacement.Id] = replacement;
+        }
+        Save();
+    }
+
     private static IReadOnlyList<ProxyNode> Load(string path) => File.Exists(path)
         ? JsonSerializer.Deserialize<List<ProxyNode>>(File.ReadAllText(path), JsonOptions) ?? []
         : [];

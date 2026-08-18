@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Rovia.Backends.SingBox;
 using Rovia.Config.Parsing;
 using Rovia.Config.Storage;
+using Rovia.Config.Subscriptions;
 using Rovia.Core.Engine;
 using Rovia.Core.Failover;
 using Rovia.Core.Health;
@@ -30,6 +31,7 @@ internal static class RoviaCli
         string dataDirectory = Environment.GetEnvironmentVariable("ROVIA_DATA_DIR")
             ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Rovia");
         JsonNodeRepository repository = new(Path.Combine(dataDirectory, "nodes.json"), new WindowsCredentialProtector());
+        JsonSubscriptionStore subscriptions = new(Path.Combine(dataDirectory, "subscriptions.json"));
         try
         {
             return args[0].ToLowerInvariant() switch
@@ -37,6 +39,10 @@ internal static class RoviaCli
                 "import"       => Import(args, repository),
                 "list"         => List(repository),
                 "remove"       => Remove(args, repository),
+                "subscription-add"     => await AddSubscriptionAsync(args, repository, subscriptions),
+                "subscription-list"    => ListSubscriptions(subscriptions),
+                "subscription-refresh" => await RefreshSubscriptionsAsync(args, repository, subscriptions),
+                "subscription-remove"  => RemoveSubscription(args, repository, subscriptions),
                 "probe"        => await ProbeAsync(repository),
                 "rank"         => await RankAsync(repository),
                 "connect"      => await ConnectAsync(args, repository, dataDirectory, false),
@@ -50,7 +56,8 @@ internal static class RoviaCli
                 _              => Unknown(args[0])
             };
         }
-        catch (Exception exception) when (exception is ProxyLinkParseException or InvalidOperationException or IOException or Win32Exception)
+        catch (Exception exception) when (exception is ProxyLinkParseException or InvalidOperationException or IOException or
+                                          HttpRequestException or TaskCanceledException or Win32Exception)
         {
             Console.Error.WriteLine($"error: {exception.Message}");
             return 2;
@@ -81,6 +88,70 @@ internal static class RoviaCli
         Console.WriteLine($"removed {args[1]}");
         return 0;
     }
+
+    private static async Task<int> AddSubscriptionAsync(
+        string[] args,
+        JsonNodeRepository repository,
+        JsonSubscriptionStore subscriptions)
+    {
+        RequireArguments(args, 3, "subscription-add requires a name and an HTTP(S) URL.");
+        if (!Uri.TryCreate(args[2], UriKind.Absolute, out Uri? source) || source.Scheme is not ("http" or "https"))
+            throw new InvalidOperationException("Subscription URL must use HTTP or HTTPS.");
+        SubscriptionDefinition definition = new()
+        {
+            Id     = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(source.ToString())))[..24].ToLowerInvariant(),
+            Name   = args[1],
+            Source = source
+        };
+        subscriptions.Upsert(definition);
+        SubscriptionImportResult result = await CreateSubscriptionService(repository, subscriptions).RefreshAsync(definition);
+        Console.WriteLine($"added {definition.Id}\t{definition.Name}\t{result.Nodes.Count} nodes\t{result.Warnings.Count} warnings");
+        return 0;
+    }
+
+    private static int ListSubscriptions(JsonSubscriptionStore subscriptions)
+    {
+        foreach (SubscriptionDefinition definition in subscriptions.GetAll())
+            Console.WriteLine($"{definition.Id}\t{definition.Name}\t{(definition.Enabled ? "enabled" : "disabled")}\t{definition.LastRefreshedAt?.ToString("O") ?? "never"}\t{definition.LastError ?? "ok"}");
+        return 0;
+    }
+
+    private static async Task<int> RefreshSubscriptionsAsync(
+        string[] args,
+        JsonNodeRepository repository,
+        JsonSubscriptionStore subscriptions)
+    {
+        IReadOnlyList<SubscriptionDefinition> definitions = subscriptions.GetAll();
+        if (args.Length >= 2)
+            definitions = [definitions.FirstOrDefault(item => item.Id == args[1])
+                ?? throw new InvalidOperationException($"Subscription '{args[1]}' was not found.")];
+        SubscriptionRefreshService service = CreateSubscriptionService(repository, subscriptions);
+        foreach (SubscriptionDefinition definition in definitions.Where(item => item.Enabled))
+        {
+            SubscriptionImportResult result = await service.RefreshAsync(definition);
+            Console.WriteLine($"refreshed {definition.Id}\t{result.Nodes.Count} nodes\t{result.DuplicateCount} duplicates\t{result.Warnings.Count} warnings");
+        }
+        return 0;
+    }
+
+    private static int RemoveSubscription(
+        string[] args,
+        JsonNodeRepository repository,
+        JsonSubscriptionStore subscriptions)
+    {
+        RequireArguments(args, 2, "subscription-remove requires a subscription identifier.");
+        SubscriptionDefinition definition = subscriptions.GetAll().FirstOrDefault(item => item.Id == args[1])
+            ?? throw new InvalidOperationException($"Subscription '{args[1]}' was not found.");
+        repository.ReplaceSubscription(definition.Source.ToString(), []);
+        subscriptions.Remove(definition.Id);
+        Console.WriteLine($"removed {definition.Id}");
+        return 0;
+    }
+
+    private static SubscriptionRefreshService CreateSubscriptionService(
+        JsonNodeRepository repository,
+        JsonSubscriptionStore subscriptions) => new(subscriptions, repository,
+            new([new VlessLinkParser(), new TrojanLinkParser(), new VmessLinkParser(), new ShadowsocksLinkParser()]));
 
     private static async Task<int> ProbeAsync(JsonNodeRepository repository)
     {
@@ -282,6 +353,10 @@ internal static class RoviaCli
           rovia import <vless-link>
           rovia list
           rovia remove <node-id>
+          rovia subscription-add <name> <url>
+          rovia subscription-list
+          rovia subscription-refresh [subscription-id]
+          rovia subscription-remove <subscription-id>
           rovia probe
           rovia rank
           rovia check-config <node-id>
