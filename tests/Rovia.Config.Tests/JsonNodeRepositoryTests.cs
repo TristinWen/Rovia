@@ -8,6 +8,50 @@ namespace Rovia.Config.Tests;
 public sealed class JsonNodeRepositoryTests
 {
     [Fact]
+    public void GetAll_ReloadsChangesWrittenByAnotherProcessInstance()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        string path      = Path.Combine(directory, "nodes.json");
+        try
+        {
+            JsonNodeRepository host    = new(path);
+            JsonNodeRepository desktop = new(path);
+
+            desktop.Add(new() { Id = "external", Host = "example.com", Port = 443 });
+
+            Assert.Equal("external", Assert.Single(host.GetAll()).Id);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
+    public async Task Add_SerializesConcurrentRepositoryWriters()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        string path      = Path.Combine(directory, "nodes.json");
+        try
+        {
+            JsonNodeRepository first  = new(path);
+            JsonNodeRepository second = new(path);
+
+            await Task.WhenAll(
+                Task.Run(() => first.Add(new() { Id = "first", Host = "one.example", Port = 443 })),
+                Task.Run(() => second.Add(new() { Id = "second", Host = "two.example", Port = 443 })));
+
+            Assert.Equal(2, new JsonNodeRepository(path).GetAll().Count);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, true);
+        }
+    }
+
+    [Fact]
     public void Add_PersistsNodeAcrossInstances()
     {
         string path = Path.Combine(Path.GetTempPath(), $"rovia-{Guid.NewGuid():N}", "nodes.json");

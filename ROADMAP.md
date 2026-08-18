@@ -32,6 +32,8 @@ Implemented and validated:
 - Plain-text and Base64 HTTP subscription import with stable deduplication.
 - Persisted subscription definitions, manual atomic provider refresh, stable node
   replacement, and preservation of user-edited node labels.
+- Cross-process node-repository reload and serialized writers so a detached host
+  observes Desktop/CLI imports and provider refreshes without lost updates.
 - Atomic JSON node persistence with current-user Windows DPAPI credential encryption
   and automatic plaintext migration.
 - Deterministic sing-box configuration and managed binary provisioning.
