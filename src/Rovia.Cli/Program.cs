@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using System.Diagnostics;
+using System.Reflection;
 using Rovia.Backends.SingBox;
 using Rovia.Config.Parsing;
 using Rovia.Config.Storage;
@@ -45,8 +47,10 @@ internal static class RoviaCli
                 "subscription-remove"  => RemoveSubscription(args, repository, subscriptions),
                 "probe"        => await ProbeAsync(repository),
                 "rank"         => await RankAsync(repository),
-                "connect"      => await ConnectAsync(args, repository, dataDirectory, false),
-                "connect-auto" => await ConnectAsync(args, repository, dataDirectory, true),
+                "connect"      => await LaunchHostAsync(args, dataDirectory, false),
+                "connect-auto" => await LaunchHostAsync(args, dataDirectory, true),
+                "host"         => await RunHostAsync(args, repository, dataDirectory, false),
+                "host-auto"    => await RunHostAsync(args, repository, dataDirectory, true),
                 "status"       => await StatusAsync(dataDirectory),
                 "disconnect"   => await DisconnectAsync(dataDirectory),
                 "speed-test"   => await SpeedTestAsync(dataDirectory),
@@ -57,7 +61,7 @@ internal static class RoviaCli
             };
         }
         catch (Exception exception) when (exception is ProxyLinkParseException or InvalidOperationException or IOException or
-                                          HttpRequestException or TaskCanceledException or Win32Exception)
+                                          HttpRequestException or TaskCanceledException or TimeoutException or Win32Exception)
         {
             Console.Error.WriteLine($"error: {exception.Message}");
             return 2;
@@ -175,10 +179,55 @@ internal static class RoviaCli
         return 0;
     }
 
-    private static async Task<int> ConnectAsync(string[] args, JsonNodeRepository repository, string dataDirectory, bool automatic)
+    private static async Task<int> LaunchHostAsync(string[] args, string dataDirectory, bool automatic)
     {
         if (!automatic)
             RequireArguments(args, 2, "connect requires a node identifier.");
+        RuntimeState? current = new RuntimeStateStore(Path.Combine(dataDirectory, "runtime-state.json")).Read();
+        if (current is { IsRunning: true })
+            throw new InvalidOperationException("Rovia is already connected.");
+
+        string executable = Environment.ProcessPath ?? throw new InvalidOperationException("Unable to locate the Rovia executable.");
+        ProcessStartInfo startInfo = new()
+        {
+            FileName               = executable,
+            UseShellExecute        = false,
+            CreateNoWindow         = true,
+            RedirectStandardError  = true,
+            RedirectStandardOutput = true
+        };
+        if (string.Equals(Path.GetFileNameWithoutExtension(executable), "dotnet", StringComparison.OrdinalIgnoreCase))
+            startInfo.ArgumentList.Add(Assembly.GetEntryAssembly()?.Location
+                ?? throw new InvalidOperationException("Unable to locate the Rovia CLI assembly."));
+        startInfo.ArgumentList.Add(automatic ? "host-auto" : "host");
+        if (!automatic)
+            startInfo.ArgumentList.Add(args[1]);
+        using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to start the Rovia background host.");
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddMinutes(2);
+        string statePath        = Path.Combine(dataDirectory, "runtime-state.json");
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (new RuntimeStateStore(statePath).Read() is { IsRunning: true } state)
+            {
+                Console.WriteLine($"connected {state.NodeName} via {state.LocalEndpoint}");
+                return 0;
+            }
+            if (process.HasExited)
+            {
+                string error = await process.StandardError.ReadToEndAsync();
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
+                    ? "Rovia background host exited before becoming ready."
+                    : error.Trim());
+            }
+            await Task.Delay(250);
+        }
+        throw new TimeoutException("Rovia background host did not become ready within two minutes.");
+    }
+
+    private static async Task<int> RunHostAsync(string[] args, JsonNodeRepository repository, string dataDirectory, bool automatic)
+    {
+        if (!automatic)
+            RequireArguments(args, 2, "host requires a node identifier.");
         using Mutex runtimeMutex = new(false, $"Rovia.Runtime.{Environment.UserName}", out bool ownsRuntime);
         if (!ownsRuntime)
             throw new InvalidOperationException("Another Rovia runtime is already connected or connecting.");
@@ -204,6 +253,7 @@ internal static class RoviaCli
         string pipeName     = $"rovia-{Environment.UserName}";
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         ProxyPerformance? performance = null;
+        string runtimeMessage = $"Egress verified in {egress.Duration.TotalMilliseconds:0} ms.";
         using HttpProxyPerformanceProbe performanceProbe = new();
         RuntimeStateStore stateStore = new(statePath);
         using CancellationTokenSource exit = new();
@@ -213,7 +263,7 @@ internal static class RoviaCli
             IsRunning = !exit.IsCancellationRequested, ProcessId = Environment.ProcessId, BackendProcessId = status.ProcessId, NodeId = engine.CurrentNode?.Id,
             NodeName = engine.CurrentNode is null ? null : DisplayName(engine.CurrentNode), LocalEndpoint = status.LocalEndpoint?.ToString(),
             FailoverState = engine.FailoverState, StartedAt = startedAt, UpdatedAt = DateTimeOffset.UtcNow,
-            LastMessage = performance?.Message ?? (egress.Success ? $"Egress verified in {egress.Duration.TotalMilliseconds:0} ms." : egress.Message),
+            LastMessage = performance?.Message ?? runtimeMessage,
             ProxyLatencyMs = performance?.LatencyMs, DownloadMbps = performance?.DownloadMbps, PerformanceAt = performance?.MeasuredAt
         };
         stateStore.Write(State());
@@ -226,20 +276,53 @@ internal static class RoviaCli
         Task serverTask             = server.RunAsync(exit.Token);
         AdaptiveRouteMonitor monitor = new(engine, new RouteHistoryStore(historyPath), TimeSpan.FromSeconds(30));
         Task monitorTask             = automatic ? monitor.RunAsync(exit.Token) : Task.CompletedTask;
+        Task subscriptionTask        = automatic ? RefreshSubscriptionsPeriodicallyAsync(repository, dataDirectory, log, exit.Token) : Task.CompletedTask;
+        RuntimeLifetimeSupervisor supervisor = new(engine.GetStatusAsync, TimeSpan.FromSeconds(2));
+        Task supervisorTask = supervisor.RunAsync(message =>
+        {
+            runtimeMessage = message;
+            stateStore.Write(State());
+            log.Write("Error", "runtime.backend-exited", message);
+            exit.Cancel();
+        }, exit.Token);
         SingBoxOptions activeOptions = CreateOptions(dataDirectory, singBoxPath);
         IDisposable? proxyLease      = OperatingSystem.IsWindows() && activeOptions.Mode == SingBoxConnectionMode.SystemProxy
             ? SystemProxyLease.Activate(new WindowsSystemProxySettings(), snapshotPath, $"127.0.0.1:{activeOptions.ListenPort}")
             : null;
-        Console.WriteLine($"connected {DisplayName(node)} via {status.LocalEndpoint}; egress verified");
         log.Write("Information", "runtime.connected", $"Connected node {node.Id} on local port {activeOptions.ListenPort}.");
-        Console.WriteLine("Use 'rovia disconnect' or press Ctrl+C to disconnect.");
         try { await Task.Delay(Timeout.InfiniteTimeSpan, exit.Token); } catch (OperationCanceledException) { }
         proxyLease?.Dispose();
         await engine.DisconnectAsync();
         stateStore.Write(State() with { IsRunning = false, LastMessage = "Disconnected cleanly." });
         log.Write("Information", "runtime.disconnected", "Disconnected cleanly and restored platform settings.");
-        try { await Task.WhenAll(serverTask, monitorTask); } catch (OperationCanceledException) { }
+        try { await Task.WhenAll(serverTask, monitorTask, subscriptionTask, supervisorTask); } catch (OperationCanceledException) { }
         return 0;
+    }
+
+    private static async Task RefreshSubscriptionsPeriodicallyAsync(
+        JsonNodeRepository repository,
+        string dataDirectory,
+        RuntimeLog log,
+        CancellationToken cancellationToken)
+    {
+        JsonSubscriptionStore subscriptions = new(Path.Combine(dataDirectory, "subscriptions.json"));
+        SubscriptionRefreshService service   = CreateSubscriptionService(repository, subscriptions);
+        using PeriodicTimer timer             = new(TimeSpan.FromMinutes(5));
+        do
+        {
+            try
+            {
+                IReadOnlyList<SubscriptionImportResult> results = await service.RefreshDueAsync(DateTimeOffset.UtcNow, cancellationToken);
+                if (results.Count > 0)
+                    log.Write("Information", "subscriptions.refreshed", $"Refreshed {results.Count} due subscription providers.");
+            }
+            catch (Exception exception) when (exception is HttpRequestException or IOException or TaskCanceledException)
+            {
+                if (!cancellationToken.IsCancellationRequested)
+                    log.Write("Warning", "subscriptions.refresh-failed", exception.Message);
+            }
+        }
+        while (await timer.WaitForNextTickAsync(cancellationToken));
     }
 
     private static async Task<int> StatusAsync(string dataDirectory)

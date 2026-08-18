@@ -40,6 +40,8 @@ Implemented and validated:
 - Real proxy egress checks, multi-target diagnostics, warmed median proxy latency,
   and bounded quick download throughput measurements.
 - Cross-process runtime status, speed-test, diagnostics, and clean disconnect.
+- Detached runtime ownership independent of the invoking CLI/Desktop, repeated
+  backend-exit supervision, and scheduled due-provider refresh.
 - Windows system-proxy snapshot and restoration.
 - Startup preflight for occupied proxy ports plus interrupted-session recovery for
   orphaned sing-box processes and pending system-proxy snapshots.
@@ -66,21 +68,16 @@ Credentials and generated binaries must never be committed.
 
 ## Active handoff
 
-Current focus: **P0 — Windows reliability**. The repository is ready to continue
-from the durable background-host milestone; no local feature work is pending.
+Current focus: **P0 — Windows reliability**. Detached background-host ownership is
+implemented; Windows startup registration and operating-system event recovery remain.
 
 Recommended next development slice:
 
-1. Define a versioned runtime-host contract and lifecycle states without moving
-   platform behavior into Core.
-2. Add a durable Windows background host that owns sing-box independently of the
-   CLI and Desktop processes.
-3. Reuse the existing runtime control, state, preflight, recovery, logging, and
-   diagnostic components from that host.
-4. Add lifecycle tests for start, duplicate start, clean stop, backend early exit,
-   and recovery after an unclean host termination.
-5. Update CLI and Desktop launch/control paths only after the host contract and
-   lifecycle tests are stable.
+1. Register the detached host as an optional per-user Windows startup task.
+2. React to sleep/resume and network-interface changes by revalidating backend
+   egress and selecting a healthy route.
+3. Add integration coverage for duplicate start, clean stop, and unclean process
+   recovery around a controllable fake backend.
 
 After that slice, continue P0 with sleep/resume and network-interface recovery,
 elevated real-TUN validation and cleanup, local ACL hardening, and Desktop tray /
@@ -107,8 +104,8 @@ after the durable host owns runtime lifecycle reliably.
 
 Goal: make the current prototype safe for daily use.
 
-- Add a durable background host or Windows service instead of tying runtime life to
-  the CLI process.
+- Detached background ownership is implemented; optional per-user startup
+  registration remains instead of requiring an elevated system service.
 - Recover sing-box, routes, and system proxy after crashes, sleep, resume, and
   network-interface changes.
 - Validate real TUN connection under elevation and implement explicit route cleanup.
@@ -208,9 +205,9 @@ native service/extension must continue when the Unity UI process is suspended.
 
 - Windows TUN configuration is generated and checked, but real elevated TUN traffic
   has not been accepted as a release-quality validated feature.
-- Runtime is a child CLI host, not an installed service.
-- Subscription providers and manual refresh are persisted; background scheduling
-  awaits the durable runtime host.
+- Runtime is a detached host independent of CLI/Desktop, but is not registered for
+  per-user Windows startup and does not yet consume OS resume/network events.
+- Subscription providers, manual refresh, and background due refresh are persisted.
 - Routing rules and DNS policies exist as Core models but are not fully mapped into
   sing-box configuration.
 - Only sing-box is implemented as a backend.

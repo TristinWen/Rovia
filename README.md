@@ -80,9 +80,10 @@ rovia export-diagnostics [output.zip]
 rovia disconnect
 ```
 
-`connect` runs as the owner of sing-box and exposes a mixed HTTP/SOCKS proxy at
+`connect` starts a detached runtime host that owns sing-box and exposes a mixed HTTP/SOCKS proxy at
 `127.0.0.1:2080` by default. It verifies real HTTP egress before changing the
-Windows system proxy. Use `disconnect` or press Ctrl+C for an orderly shutdown;
+Windows system proxy. The runtime remains active after the invoking CLI or Desktop
+window exits. Use `disconnect` for an orderly shutdown;
 the exact previous system proxy configuration is then restored.
 Set `ROVIA_SING_BOX` to a custom executable path, `ROVIA_LISTEN_PORT` to change
 the endpoint, or `ROVIA_DATA_DIR` to relocate local state.
@@ -123,8 +124,9 @@ existing libraries and controls the same runtime host as the CLI.
 Rovia is a functional Core, runtime, CLI, and Desktop prototype. sing-box supports
 the implemented VLESS, Trojan, VMess, and Shadowsocks models. Health checks measure TCP
 reachability for ranking, while connection activation separately verifies HTTP
-egress. The runtime monitors routes every 30 seconds and applies policy-controlled
-switching; it is not yet installed as an operating-system service.
+egress. The detached runtime host monitors routes every 30 seconds, refreshes due
+subscriptions, detects repeated backend exits, and applies policy-controlled
+switching. It is not yet registered as an operating-system service or startup task.
 
 TUN configuration is opt-in and validated against sing-box, but requires an
 elevated Windows process for real traffic capture. Mobile platform VPN bridges,

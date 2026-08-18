@@ -213,14 +213,14 @@ public partial class MainWindow : Window
         string statePath        = Path.Combine(_dataDirectory, "runtime-state.json");
         while (DateTimeOffset.UtcNow < deadline)
         {
+            if (new RuntimeStateStore(statePath).Read() is { IsRunning: true })
+                return;
             if (process.HasExited)
             {
                 string error  = await process.StandardError.ReadToEndAsync();
                 string output = await process.StandardOutput.ReadToEndAsync();
                 throw new InvalidOperationException(string.IsNullOrWhiteSpace(error) ? output.Trim() : error.Trim());
             }
-            if (new RuntimeStateStore(statePath).Read() is { IsRunning: true })
-                return;
             await Task.Delay(500);
         }
         throw new TimeoutException("Rovia did not finish preparing sing-box within two minutes.");
