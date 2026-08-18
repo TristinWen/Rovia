@@ -58,6 +58,8 @@ Implemented and validated:
   speed testing, connection, and disconnection.
 - Persisted backend-independent routing/DNS policy with deterministic sing-box
   domain, suffix, CIDR, process, direct, proxy, reject, and proxied-DNS mapping.
+- Generated policy configuration validates against installed sing-box 1.12 with
+  an explicit local bootstrap resolver and proxied remote application DNS.
 - Self-contained Windows x64 publish output with a separate CLI runtime folder.
 
 Last known validation baseline:
@@ -66,7 +68,7 @@ Last known validation baseline:
 dotnet build Rovia.sln --configuration Release
 dotnet test Rovia.sln --configuration Release --no-build
 
-33 tests passed
+47 tests passed (including opt-in installed sing-box configuration validation)
 0 build warnings
 0 build errors
 ```

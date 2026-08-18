@@ -84,7 +84,7 @@ public sealed class SingBoxConfigBuilder
             }
             mapped.Add(result);
         }
-        return new() { ["rules"] = mapped, ["final"] = "proxy" };
+        return new() { ["rules"] = mapped, ["final"] = "proxy", ["default_domain_resolver"] = "local" };
     }
 
     private static void AddArray(JsonObject target, string name, IReadOnlyList<string> values)

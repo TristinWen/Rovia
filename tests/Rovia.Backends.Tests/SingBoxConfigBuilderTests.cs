@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Rovia.Backends.SingBox;
 using Rovia.Core.Models;
 using Rovia.Core.Policies;
@@ -59,6 +60,7 @@ public sealed class SingBoxConfigBuilderTests
         Assert.Equal("direct", rules[0].GetProperty("outbound").GetString());
         Assert.Equal("reject", rules[1].GetProperty("action").GetString());
         Assert.Equal("proxy", rules[2].GetProperty("outbound").GetString());
+        Assert.Equal("local", root.GetProperty("route").GetProperty("default_domain_resolver").GetString());
         Assert.Equal("proxy", root.GetProperty("dns").GetProperty("servers")[0].GetProperty("detour").GetString());
         Assert.False(root.GetProperty("dns").GetProperty("disable_cache").GetBoolean());
     }
@@ -70,5 +72,46 @@ public sealed class SingBoxConfigBuilderTests
         SingBoxOptions options = new() { RoutingRules = [new()] };
 
         Assert.Throws<InvalidOperationException>(() => new SingBoxConfigBuilder().Build(node, options));
+    }
+
+    [Fact]
+    public async Task Build_PassesInstalledSingBoxValidationWhenEnabled()
+    {
+        string? executable = Environment.GetEnvironmentVariable("ROVIA_SING_BOX_TEST_PATH");
+        if (string.IsNullOrWhiteSpace(executable))
+            return;
+        string directory = Path.Combine(Path.GetTempPath(), $"rovia-config-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            ProxyNode node = new()
+            {
+                Protocol = ProxyProtocol.Vless, Host = "example.com", Port = 443,
+                Credentials = new("11111111-1111-1111-1111-111111111111"), Tls = new(true, "example.com")
+            };
+            SingBoxOptions options = new()
+            {
+                RoutingRules =
+                [
+                    new() { DomainSuffixes = ["internal.example"], Action = RouteAction.Direct },
+                    new() { Domains = ["tracker.example"], Action = RouteAction.Block }
+                ]
+            };
+            string configPath = Path.Combine(directory, "sing-box.json");
+            await File.WriteAllTextAsync(configPath, new SingBoxConfigBuilder().Build(node, options));
+            ProcessStartInfo startInfo = new(executable) { RedirectStandardError = true, RedirectStandardOutput = true, UseShellExecute = false };
+            startInfo.ArgumentList.Add("check");
+            startInfo.ArgumentList.Add("-c");
+            startInfo.ArgumentList.Add(configPath);
+            using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to start sing-box validation.");
+            string error          = await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            Assert.True(process.ExitCode == 0, error);
+        }
+        finally
+        {
+            Directory.Delete(directory, true);
+        }
     }
 }
