@@ -13,4 +13,5 @@ public sealed record SingBoxOptions
     public string TunStack { get; init; } = "mixed";
     public IReadOnlyList<RoutingRule> RoutingRules { get; init; } = [];
     public DnsPolicy DnsPolicy { get; init; } = new();
+    public string LogLevel { get; init; } = "info";
 }

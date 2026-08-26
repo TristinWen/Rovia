@@ -9,6 +9,7 @@ using Rovia.Config.Subscriptions;
 using Rovia.Core.Models;
 using Rovia.Platform.Windows.Security;
 using Rovia.Runtime.Runtime;
+using System.Text.Json;
 
 namespace Rovia.Desktop;
 
@@ -23,6 +24,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<LogEntry> _log = [];
     private readonly JsonNodeRepository _repository;
     private bool _speedTestRunning;
+    private string _logLevel = "info";
     private Process? _runtimeProcess;
 
     public MainWindow()
@@ -34,6 +36,9 @@ public partial class MainWindow : Window
         ReloadNodes();
         AppendLog("INFO", "Application started.");
         Opened += async (_, _) => await RefreshStatusAsync();
+        LoadSettings();
+        ApplyLogLevelSelection();
+        LogLevelComboBox.SelectionChanged += LogLevelChanged;
     }
 
     private async void ImportLinkClicked(object? sender, RoutedEventArgs eventArgs)
@@ -125,6 +130,7 @@ public partial class MainWindow : Window
             };
             startInfo.Environment["ROVIA_DATA_DIR"] = _dataDirectory;
             startInfo.Environment["ROVIA_MODE"]     = (ModeComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "system-proxy";
+            startInfo.Environment["ROVIA_LOG_LEVEL"] = _logLevel;
             Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to start the Rovia runtime.");
             _runtimeProcess = process;
             _ = Task.Run(() => ReadRuntimeOutputStreamAsync(process.StandardOutput, "INFO"));
@@ -324,6 +330,58 @@ public partial class MainWindow : Window
         }
         catch (ObjectDisposedException) { }
         catch (IOException) { }
+    }
+
+    private void LoadSettings()
+    {
+        string path = Path.Combine(_dataDirectory, "settings.json");
+        if (!File.Exists(path))
+            return;
+        try
+        {
+            using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(path));
+            if (doc.RootElement.TryGetProperty("LogLevel", out JsonElement level))
+                _logLevel = level.GetString() ?? "info";
+        }
+        catch
+        {
+        }
+    }
+
+    private void ApplyLogLevelSelection()
+    {
+        LogLevelComboBox.SelectedIndex = _logLevel switch
+        {
+            "trace" => 0,
+            "debug" => 1,
+            "info"  => 2,
+            "warn"  => 3,
+            "error" => 4,
+            _       => 2
+        };
+    }
+
+    private async void LogLevelChanged(object? sender, SelectionChangedEventArgs eventArgs)
+    {
+        if (LogLevelComboBox.SelectedItem is not ComboBoxItem item || item.Tag is not string level || level == _logLevel)
+            return;
+        _logLevel = level;
+        AppendLog("INFO", $"Log level set to {level} (applies on next connect).");
+        await SaveSettingsAsync();
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        try
+        {
+            string path = Path.Combine(_dataDirectory, "settings.json");
+            Directory.CreateDirectory(_dataDirectory);
+            await File.WriteAllTextAsync(path, JsonSerializer.Serialize(new { LogLevel = _logLevel }));
+        }
+        catch (Exception exception)
+        {
+            AppendLog("WARN", $"Failed to save settings: {exception.Message}");
+        }
     }
 
     private void ReloadNodes()

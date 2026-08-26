@@ -572,7 +572,8 @@ internal static class RoviaCli
             Mode             = Environment.GetEnvironmentVariable("ROVIA_MODE")?.Equals("tun", StringComparison.OrdinalIgnoreCase) == true
                 ? SingBoxConnectionMode.Tun : SingBoxConnectionMode.SystemProxy,
             RoutingRules     = routing.Rules,
-            DnsPolicy        = routing.Dns
+            DnsPolicy        = routing.Dns,
+            LogLevel         = Environment.GetEnvironmentVariable("ROVIA_LOG_LEVEL") ?? "info",
         };
     }
 

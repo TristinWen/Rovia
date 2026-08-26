@@ -28,7 +28,7 @@ public sealed class SingBoxConfigBuilder
 
         JsonObject root = new()
         {
-            ["log"] = new JsonObject { ["level"] = "info", ["timestamp"] = true },
+            ["log"] = new JsonObject { ["level"] = options.LogLevel, ["timestamp"] = true },
             ["inbounds"] = BuildInbounds(options),
             ["outbounds"] = new JsonArray { outbound, new JsonObject { ["type"] = "direct", ["tag"] = "direct" } },
             ["dns"] = BuildDns(options.DnsPolicy),
