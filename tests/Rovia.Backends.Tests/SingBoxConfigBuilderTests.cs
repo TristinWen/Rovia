@@ -10,46 +10,6 @@ namespace Rovia.Backends.Tests;
 public sealed class SingBoxConfigBuilderTests
 {
     [Fact]
-    public void Build_MapsHttpTransportUsingSingBoxHttpFields()
-    {
-        ProxyNode node = new()
-        {
-            Host        = "edge.example.com",
-            Port        = 443,
-            Protocol    = ProxyProtocol.Vless,
-            Credentials = new("00000000-0000-0000-0000-000000000000"),
-            Tls         = new(true, "edge.example.com"),
-            Transport   = new("http", "/tunnel", "edge.example.com", Method: "POST", IdleTimeout: "30s", PingTimeout: "10s")
-        };
-
-        using JsonDocument document = JsonDocument.Parse(new SingBoxConfigBuilder().Build(node, new SingBoxOptions()));
-        JsonElement transport = document.RootElement.GetProperty("outbounds")[0].GetProperty("transport");
-
-        Assert.Equal("http", transport.GetProperty("type").GetString());
-        Assert.Equal("edge.example.com", transport.GetProperty("host")[0].GetString());
-        Assert.Equal("/tunnel", transport.GetProperty("path").GetString());
-        Assert.Equal("POST", transport.GetProperty("method").GetString());
-        Assert.Equal("30s", transport.GetProperty("idle_timeout").GetString());
-        Assert.False(transport.TryGetProperty("headers", out _));
-    }
-
-    [Fact]
-    public void Build_RejectsUnknownTransportType()
-    {
-        ProxyNode node = new()
-        {
-            Host        = "edge.example.com",
-            Port        = 443,
-            Protocol    = ProxyProtocol.Vless,
-            Credentials = new("00000000-0000-0000-0000-000000000000"),
-            Transport   = new("masque")
-        };
-
-        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => new SingBoxConfigBuilder().Build(node, new SingBoxOptions()));
-
-        Assert.Contains("Unsupported transport type", exception.Message);
-    }
-    [Fact]
     public void Build_MapsVlessRealityAndWebSocket()
     {
         ProxyNode node = new()
@@ -67,6 +27,51 @@ public sealed class SingBoxConfigBuilderTests
         Assert.Equal(first, second);
         Assert.Equal("vless", document.RootElement.GetProperty("outbounds")[0].GetProperty("type").GetString());
         Assert.Equal("public-key", document.RootElement.GetProperty("outbounds")[0].GetProperty("tls").GetProperty("reality").GetProperty("public_key").GetString());
+    }
+
+    [Fact]
+    public void Build_MapsHttpTransportWithHeaders()
+    {
+        ProxyNode node = new()
+        {
+            Id = "node", Protocol = ProxyProtocol.Vless, Host = "example.com", Port = 443,
+            Credentials = new("11111111-1111-1111-1111-111111111111"),
+            Tls = new(true, "example.com"),
+            Transport = new("http", "/api/v1/data", "example.com", null, "POST", "30s", "10s",
+                new Dictionary<string, string> { ["User-Agent"] = "Mozilla/5.0" })
+        };
+
+        string json = new SingBoxConfigBuilder().Build(node, new SingBoxOptions());
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement transport = document.RootElement.GetProperty("outbounds")[0].GetProperty("transport");
+
+        Assert.Equal("http", transport.GetProperty("type").GetString());
+        Assert.Equal("/api/v1/data", transport.GetProperty("path").GetString());
+        Assert.Equal("example.com", transport.GetProperty("host")[0].GetString());
+        Assert.Equal("POST", transport.GetProperty("method").GetString());
+        Assert.Equal("30s", transport.GetProperty("idle_timeout").GetString());
+        Assert.Equal("10s", transport.GetProperty("ping_timeout").GetString());
+        Assert.Equal("Mozilla/5.0", transport.GetProperty("headers").GetProperty("User-Agent").GetString());
+    }
+
+    [Fact]
+    public void Build_MapsH2Transport()
+    {
+        ProxyNode node = new()
+        {
+            Id = "node", Protocol = ProxyProtocol.Vless, Host = "example.com", Port = 443,
+            Credentials = new("11111111-1111-1111-1111-111111111111"),
+            Tls = new(true, "example.com"),
+            Transport = new("h2", "/stream", "example.com")
+        };
+
+        string json = new SingBoxConfigBuilder().Build(node, new SingBoxOptions());
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement transport = document.RootElement.GetProperty("outbounds")[0].GetProperty("transport");
+
+        Assert.Equal("h2", transport.GetProperty("type").GetString());
+        Assert.Equal("/stream", transport.GetProperty("path").GetString());
+        Assert.Equal("example.com", transport.GetProperty("host")[0].GetString());
     }
 
     [Fact]

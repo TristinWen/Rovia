@@ -8,4 +8,5 @@ public sealed record TransportOptions(
     string? ServiceName = null,
     string? Method = null,
     string? IdleTimeout = null,
-    string? PingTimeout = null);
+    string? PingTimeout = null,
+    IDictionary<string, string>? Headers = null);

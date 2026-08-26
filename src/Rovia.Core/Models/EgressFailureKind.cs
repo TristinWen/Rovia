@@ -9,5 +9,6 @@ public enum EgressFailureKind
     Tls,
     Authentication,
     Http,
-    Connection
+    Connection,
+    DpiBlocked
 }

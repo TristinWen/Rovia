@@ -154,6 +154,13 @@ public sealed class SingBoxConfigBuilder
                 Add(result, "method", transport.Method);
                 Add(result, "idle_timeout", transport.IdleTimeout);
                 Add(result, "ping_timeout", transport.PingTimeout);
+                if (transport.Headers is { Count: > 0 })
+                {
+                    JsonObject headers = new();
+                    foreach (var pair in transport.Headers)
+                        headers[pair.Key] = pair.Value;
+                    result["headers"] = headers;
+                }
                 break;
             case "ws":
                 Add(result, "path", transport.Path);
@@ -165,8 +172,10 @@ public sealed class SingBoxConfigBuilder
                 Add(result, "idle_timeout", transport.IdleTimeout);
                 Add(result, "ping_timeout", transport.PingTimeout);
                 break;
+            case "h2":
             case "httpupgrade":
-                Add(result, "host", transport.Host);
+                if (!string.IsNullOrWhiteSpace(transport.Host))
+                    result["host"] = type == "h2" ? new JsonArray(transport.Host) : transport.Host;
                 Add(result, "path", transport.Path);
                 break;
             case "quic":
