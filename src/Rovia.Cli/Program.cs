@@ -56,6 +56,7 @@ internal static class RoviaCli
                 "disconnect"   => await DisconnectAsync(dataDirectory),
                 "speed-test"   => await SpeedTestAsync(dataDirectory),
                 "diagnose"     => await DiagnoseAsync(dataDirectory),
+                "network-diagnose" => await NetworkDiagnoseAsync(args, repository),
                 "history"      => ShowHistory(dataDirectory),
                 "export-diagnostics" => ExportDiagnostics(args, dataDirectory),
                 "check-config" => CheckConfig(args, repository, dataDirectory),
@@ -236,6 +237,12 @@ internal static class RoviaCli
         RuntimeLog log = new(Path.Combine(dataDirectory, "logs"));
         RecoverInterruptedRuntime(dataDirectory);
         SingBoxOptions requestedOptions = CreateOptions(dataDirectory);
+        NetworkEnvironmentSnapshot environment = NetworkEnvironmentInspector.Capture();
+        if (requestedOptions.Mode == SingBoxConnectionMode.Tun && environment.CloudflareWarpDetected)
+        {
+            throw new InvalidOperationException(
+                "Cloudflare WARP is active. Use system-proxy mode so Rovia can share the WARP path without creating a conflicting second TUN interface.");
+        }
         RuntimePreflight.EnsurePortAvailable(requestedOptions.ListenPort);
         string singBoxPath = await new SingBoxProvisioner().EnsureAsync(dataDirectory);
         await using AdaptiveRouteEngine engine = CreateEngine(repository, dataDirectory, singBoxPath);
@@ -245,9 +252,10 @@ internal static class RoviaCli
         if (!automatic)
             await engine.ConnectAsync(node);
         BackendStatus status = await engine.GetStatusAsync();
-        EgressProbeResult egress = await new HttpEgressProbe().ProbeAsync(status.LocalEndpoint!, new("https://www.google.com/generate_204"));
-        if (!egress.Success)
-            throw new InvalidOperationException($"Proxy egress check failed ({egress.FailureKind}): {egress.Message}");
+        EgressVerificationResult verification = await new MultiTargetEgressVerifier(new HttpEgressProbe()).VerifyAsync(status.LocalEndpoint!);
+        if (!verification.Success)
+            throw new InvalidOperationException(verification.Message);
+        EgressProbeResult egress = verification.FastestSuccess!;
 
         string statePath    = Path.Combine(dataDirectory, "runtime-state.json");
         string historyPath  = Path.Combine(dataDirectory, "route-history.json");
@@ -255,7 +263,7 @@ internal static class RoviaCli
         string pipeName     = $"rovia-{Environment.UserName}";
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         ProxyPerformance? performance = null;
-        string runtimeMessage = $"Egress verified in {egress.Duration.TotalMilliseconds:0} ms.";
+        string runtimeMessage = $"{verification.Message} Fastest response: {egress.Target.Host} in {egress.Duration.TotalMilliseconds:0} ms.";
         using HttpProxyPerformanceProbe performanceProbe = new();
         RuntimeStateStore stateStore = new(statePath);
         using CancellationTokenSource exit = new();
@@ -385,6 +393,57 @@ internal static class RoviaCli
         return results.Any(result => result.Egress.Success) ? 0 : 2;
     }
 
+    private static async Task<int> NetworkDiagnoseAsync(string[] args, JsonNodeRepository repository)
+    {
+        ProxyNode? configured = args.Length < 2
+            ? repository.GetAll().FirstOrDefault()
+            : repository.GetAll().FirstOrDefault(node => node.Host.Equals(args[1], StringComparison.OrdinalIgnoreCase) &&
+                                                         (args.Length < 3 || !int.TryParse(args[2], out int matchedPort) || node.Port == matchedPort));
+        string host = args.Length >= 2 ? args[1] : configured?.Host
+            ?? throw new InvalidOperationException("network-diagnose requires a host when no nodes are configured.");
+        int port = args.Length >= 3 && int.TryParse(args[2], out int requestedPort) ? requestedPort : configured?.Port ?? 443;
+        if (port is < 1 or > 65535)
+            throw new InvalidOperationException("Diagnostic port must be between 1 and 65535.");
+
+        NetworkEnvironmentSnapshot environment = NetworkEnvironmentInspector.Capture();
+        Console.WriteLine($"cloudflare-warp={(environment.CloudflareWarpDetected ? "detected" : "not-detected")}");
+        foreach (NetworkAdapterSnapshot adapter in environment.Adapters)
+        {
+            Console.WriteLine($"adapter\t{adapter.Name}\t{adapter.InterfaceType}\tmtu={adapter.Mtu?.ToString() ?? "unknown"}\twarp={adapter.IsCloudflareWarp}");
+            Console.WriteLine($"  addresses={string.Join(',', adapter.Addresses)}");
+            Console.WriteLine($"  dns={string.Join(',', adapter.DnsServers)}\tgateways={string.Join(',', adapter.Gateways)}");
+        }
+        if (OperatingSystem.IsWindows())
+        {
+            SystemProxySnapshot proxy = new WindowsSystemProxySettings().Read();
+            Console.WriteLine($"windows-proxy\tenabled={proxy.Enabled}\tserver={proxy.Server ?? "none"}\tpac={(proxy.AutoConfigUrl is null ? "none" : "configured")}");
+        }
+
+        EndpointConnectivityResult endpoint = await new EndpointConnectivityProbe().ProbeAsync(host, port);
+        Console.WriteLine($"endpoint\t{endpoint.Host}:{endpoint.Port}\ttls={(endpoint.TlsSucceeded ? "ok" : "failed")}\tprotocol={endpoint.TlsProtocol ?? "none"}");
+        foreach (EndpointAddressResult address in endpoint.Addresses)
+            Console.WriteLine($"  {address.Address}\ttcp={(address.TcpConnected ? "ok" : "failed")}\t{(address.TcpMilliseconds.HasValue ? $"{address.TcpMilliseconds:0.0} ms" : address.Error)}");
+        if (endpoint.TlsSucceeded)
+            Console.WriteLine($"  certificate-subject={endpoint.CertificateSubject}\n  certificate-issuer={endpoint.CertificateIssuer}");
+        else
+            Console.WriteLine($"  tls-error={endpoint.TlsError}");
+        bool websocketSucceeded = true;
+        if (configured?.Transport?.Type.Equals("ws", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            WebSocketConnectivityResult websocket = await new WebSocketConnectivityProbe().ProbeAsync(
+                configured.Host,
+                configured.Port,
+                configured.Tls?.Enabled == true,
+                configured.Transport.Path,
+                configured.Transport.Host);
+            websocketSucceeded = websocket.Success;
+            Console.WriteLine($"websocket\t{websocket.Target}\tupgrade={(websocket.Success ? "ok" : "failed")}\t{websocket.DurationMilliseconds:0.0} ms");
+            if (!websocket.Success)
+                Console.WriteLine($"  websocket-error={websocket.Error}");
+        }
+        return endpoint.Addresses.Any(address => address.TcpConnected) && endpoint.TlsSucceeded && websocketSucceeded ? 0 : 2;
+    }
+
     private static int ShowHistory(string dataDirectory)
     {
         foreach (RouteChangeRecord record in new RouteHistoryStore(Path.Combine(dataDirectory, "route-history.json")).Read().TakeLast(20))
@@ -486,6 +545,7 @@ internal static class RoviaCli
           rovia disconnect
           rovia speed-test
           rovia diagnose
+          rovia network-diagnose [host] [port]
           rovia history
           rovia export-diagnostics [output.zip]
 

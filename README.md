@@ -76,6 +76,7 @@ rovia connect-auto
 rovia status
 rovia speed-test
 rovia diagnose
+rovia network-diagnose [host] [port]
 rovia history
 rovia export-diagnostics [output.zip]
 rovia disconnect
@@ -89,9 +90,18 @@ the exact previous system proxy configuration is then restored.
 Set `ROVIA_SING_BOX` to a custom executable path, `ROVIA_LISTEN_PORT` to change
 the endpoint, or `ROVIA_DATA_DIR` to relocate local state.
 
+Before connecting, `network-diagnose` checks the selected endpoint's DNS, each
+resolved IP address, TCP 443, normal TLS certificate validation, and the configured
+WebSocket upgrade when applicable. In Desktop, select a node and press **Diagnose**
+while disconnected to run the same preflight. This distinguishes a server or
+configuration failure from a network path that resets WebSocket connections.
+
 Set `ROVIA_MODE=tun` before connecting to enable transparent TUN capture. TUN
 normally requires an elevated Windows process and does not modify the Windows
 HTTP proxy. The default `system-proxy` mode remains safer for ordinary browsing.
+When Cloudflare WARP is active, Rovia requires `system-proxy` mode to avoid two
+competing TUN interfaces. This lets Rovia use the existing WARP network path without
+changing, hiding, or bypassing the underlying network policy.
 
 Optional routing and DNS policy lives in `%LOCALAPPDATA%\Rovia\routing.json` (or
 under `ROVIA_DATA_DIR`). Rules are evaluated in order and deterministically mapped

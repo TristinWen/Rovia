@@ -159,7 +159,21 @@ public partial class MainWindow : Window
 
     private async void ProbeClicked(object? sender, RoutedEventArgs eventArgs) => await RunCliCommandAsync("rank", "Probing all nodes…");
 
-    private async void DiagnoseClicked(object? sender, RoutedEventArgs eventArgs) => await RunCliCommandAsync("diagnose", "Running DNS and egress diagnostics…");
+    private async void DiagnoseClicked(object? sender, RoutedEventArgs eventArgs)
+    {
+        RuntimeState? state = new RuntimeStateStore(Path.Combine(_dataDirectory, "runtime-state.json")).Read();
+        if (state is { IsRunning: true })
+        {
+            await RunCliCommandAsync("diagnose", "Running DNS and egress diagnostics…");
+            return;
+        }
+        if (NodeList.SelectedItem is not NodeItem selected)
+        {
+            MessageText.Text = "Select a node to diagnose before connecting.";
+            return;
+        }
+        await RunCliCommandAsync($"network-diagnose \"{selected.Host}\" {selected.Port}", "Testing DNS, TCP, TLS, and configured transport…");
+    }
 
     private async void ExportDiagnosticsClicked(object? sender, RoutedEventArgs eventArgs)
     {
@@ -230,7 +244,7 @@ public partial class MainWindow : Window
     {
         _nodes.Clear();
         foreach (ProxyNode node in _repository.GetAll())
-            _nodes.Add(new(node.Id, DisplayName(node), $"{node.Host}:{node.Port}", node.Protocol.ToString()));
+            _nodes.Add(new(node.Id, DisplayName(node), $"{node.Host}:{node.Port}", node.Protocol.ToString(), node.Host, node.Port));
     }
 
     private static string FindCliPath()
@@ -254,5 +268,5 @@ public partial class MainWindow : Window
 
     private static string DisplayName(ProxyNode node) => string.IsNullOrWhiteSpace(node.Name) ? node.Host : node.Name;
 
-    private sealed record NodeItem(string Id, string Name, string Endpoint, string Protocol);
+    private sealed record NodeItem(string Id, string Name, string Endpoint, string Protocol, string Host, int Port);
 }

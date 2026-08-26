@@ -43,6 +43,10 @@ Implemented and validated:
   deterministic ranking, hysteresis, and explicit failover state.
 - Real proxy egress checks, multi-target diagnostics, warmed median proxy latency,
   and bounded quick download throughput measurements.
+- Pre-connect endpoint diagnostics covering active adapters, Cloudflare WARP,
+  DNS, per-address TCP, TLS certificates, and configured WebSocket upgrades.
+- WARP coexistence protection that keeps Rovia in system-proxy mode instead of
+  creating a conflicting second TUN interface.
 - Cross-process runtime status, speed-test, diagnostics, and clean disconnect.
 - Detached runtime ownership independent of the invoking CLI/Desktop, repeated
   backend-exit supervision, and scheduled due-provider refresh.
@@ -68,7 +72,7 @@ Last known validation baseline:
 dotnet build Rovia.sln --configuration Release
 dotnet test Rovia.sln --configuration Release --no-build
 
-47 tests passed (including opt-in installed sing-box configuration validation)
+54 tests passed (including opt-in installed sing-box configuration validation)
 0 build warnings
 0 build errors
 ```
