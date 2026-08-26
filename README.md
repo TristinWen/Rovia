@@ -41,6 +41,7 @@ The dependency direction is intentionally constrained:
 - Durable local JSON storage with unknown share-link parameters preserved.
 - Bounded TCP health probes with rolling success, failure, latency, and jitter metrics.
 - Deterministic stability-first scoring, hysteresis, and emergency failover.
+- Startup transport fallback with real proxy-egress verification before activation.
 - Deterministic sing-box configuration and managed process lifecycle.
 - A CLI for importing, inspecting, probing, ranking, and connecting nodes.
 - A controllable runtime host with automatic monitoring and route history.
@@ -102,6 +103,18 @@ HTTP proxy. The default `system-proxy` mode remains safer for ordinary browsing.
 When Cloudflare WARP is active, Rovia requires `system-proxy` mode to avoid two
 competing TUN interfaces. This lets Rovia use the existing WARP network path without
 changing, hiding, or bypassing the underlying network policy.
+
+For TLS WebSocket nodes, startup first tries the configured hostname and then its
+currently resolved IPv4/IPv6 edge addresses. The original TLS server name and
+WebSocket `Host` are preserved, so this is normal endpoint failover rather than
+traffic concealment. It can recover when one Cloudflare edge path is unhealthy.
+
+If a server exposes multiple standard transports, import each valid share link and
+add the same `rovia-fallback-group` query value to them. A manual connection tries
+the selected node first, then only the explicitly grouped alternatives. For example,
+the WebSocket and gRPC links for one service can both include
+`rovia-fallback-group=office`. Rovia accepts a candidate only after real proxied HTTP
+egress succeeds; it never guesses unsupported server transports.
 
 Optional routing and DNS policy lives in `%LOCALAPPDATA%\Rovia\routing.json` (or
 under `ROVIA_DATA_DIR`). Rules are evaluated in order and deterministically mapped

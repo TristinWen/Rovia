@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Reflection;
+using System.Net;
 using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using Rovia.Backends.SingBox;
 using Rovia.Config.Parsing;
 using Rovia.Config.Storage;
@@ -246,15 +248,68 @@ internal static class RoviaCli
         RuntimePreflight.EnsurePortAvailable(requestedOptions.ListenPort);
         string singBoxPath = await new SingBoxProvisioner().EnsureAsync(dataDirectory);
         await using AdaptiveRouteEngine engine = CreateEngine(repository, dataDirectory, singBoxPath);
-        ProxyNode node = automatic
-            ? await engine.ConnectBestAsync()
-            : repository.Get(args[1]) ?? throw new InvalidOperationException($"Node '{args[1]}' was not found.");
-        if (!automatic)
-            await engine.ConnectAsync(node);
-        BackendStatus status = await engine.GetStatusAsync();
-        EgressVerificationResult verification = await new MultiTargetEgressVerifier(new HttpEgressProbe()).VerifyAsync(status.LocalEndpoint!);
-        if (!verification.Success)
-            throw new InvalidOperationException(verification.Message);
+        IReadOnlyList<ProxyNode> candidates;
+        if (automatic)
+        {
+            IReadOnlyList<RouteScore> scores = await engine.RankAsync();
+            candidates = scores
+                .Where(score => engine.GetHealth()[score.NodeId].State != NodeHealthState.Offline)
+                .Select(score => repository.Get(score.NodeId)!)
+                .ToArray();
+        }
+        else
+        {
+            ProxyNode primary = repository.Get(args[1]) ?? throw new InvalidOperationException($"Node '{args[1]}' was not found.");
+            candidates = FallbackCandidateSelector.ForManualSelection(primary, repository.GetAll());
+        }
+        if (candidates.Count == 0)
+            throw new InvalidOperationException("No TCP-reachable proxy node is available.");
+
+        List<ProxyNode> expandedCandidates = [];
+        foreach (ProxyNode candidate in candidates)
+        {
+            try
+            {
+                IPAddress[] addresses = await Dns.GetHostAddressesAsync(candidate.Host);
+                expandedCandidates.AddRange(ResolvedEndpointCandidateFactory.Expand(candidate, addresses));
+            }
+            catch (Exception exception) when (exception is SocketException or ArgumentException)
+            {
+                expandedCandidates.Add(candidate);
+            }
+        }
+
+        ProxyNode? node                         = null;
+        BackendStatus? status                  = null;
+        EgressVerificationResult? verification = null;
+        List<string> failures                  = [];
+        foreach (ProxyNode candidate in expandedCandidates)
+        {
+            try
+            {
+                await engine.ConnectAsync(candidate);
+                BackendStatus candidateStatus = await engine.GetStatusAsync();
+                EgressVerificationResult candidateVerification = await new MultiTargetEgressVerifier(new HttpEgressProbe()).VerifyAsync(candidateStatus.LocalEndpoint!);
+                if (!candidateVerification.Success)
+                {
+                    failures.Add($"{DisplayName(candidate)}: {candidateVerification.Message}");
+                    continue;
+                }
+                node         = candidate;
+                status       = candidateStatus;
+                verification = candidateVerification;
+                break;
+            }
+            catch (Exception exception) when (exception is IOException or InvalidOperationException or TimeoutException)
+            {
+                failures.Add($"{DisplayName(candidate)}: {exception.Message}");
+            }
+        }
+        if (node is null || status is null || verification is null)
+        {
+            await engine.DisconnectAsync();
+            throw new InvalidOperationException($"All configured transport candidates failed. {string.Join(" | ", failures)}");
+        }
         EgressProbeResult egress = verification.FastestSuccess!;
 
         string statePath    = Path.Combine(dataDirectory, "runtime-state.json");
