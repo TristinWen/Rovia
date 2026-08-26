@@ -5,4 +5,7 @@ public sealed record TransportOptions(
     string Type,
     string? Path = null,
     string? Host = null,
-    string? ServiceName = null);
+    string? ServiceName = null,
+    string? Method = null,
+    string? IdleTimeout = null,
+    string? PingTimeout = null);

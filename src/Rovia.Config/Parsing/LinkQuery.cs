@@ -15,6 +15,12 @@ internal static class LinkQuery
     {
         string type = query.GetValueOrDefault("type") ?? "tcp";
         return type.Equals("tcp", StringComparison.OrdinalIgnoreCase) ? null
-            : new(type, query.GetValueOrDefault("path"), query.GetValueOrDefault("host"), query.GetValueOrDefault("serviceName"));
+            : new(type,
+                query.GetValueOrDefault("path"),
+                query.GetValueOrDefault("host"),
+                query.GetValueOrDefault("serviceName"),
+                query.GetValueOrDefault("method"),
+                query.GetValueOrDefault("idleTimeout"),
+                query.GetValueOrDefault("pingTimeout"));
     }
 }

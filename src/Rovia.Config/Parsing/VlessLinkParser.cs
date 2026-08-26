@@ -8,7 +8,8 @@ public sealed class VlessLinkParser : IProxyLinkParser
 {
     private static readonly HashSet<string> KnownParameters = new(StringComparer.OrdinalIgnoreCase)
     {
-        "security", "sni", "fp", "pbk", "sid", "flow", "type", "path", "host", "serviceName", "encryption"
+        "security", "sni", "fp", "pbk", "sid", "flow", "type", "path", "host", "serviceName", "encryption",
+        "method", "idleTimeout", "pingTimeout"
     };
 
     public bool CanParse(string input) => input.StartsWith("vless://", StringComparison.OrdinalIgnoreCase);
@@ -54,7 +55,13 @@ public sealed class VlessLinkParser : IProxyLinkParser
         string? type = Get(parameters, "type");
         return string.IsNullOrWhiteSpace(type) || type.Equals("tcp", StringComparison.OrdinalIgnoreCase)
             ? null
-            : new(type, Get(parameters, "path"), Get(parameters, "host"), Get(parameters, "serviceName"));
+            : new(type,
+                Get(parameters, "path"),
+                Get(parameters, "host"),
+                Get(parameters, "serviceName"),
+                Get(parameters, "method"),
+                Get(parameters, "idleTimeout"),
+                Get(parameters, "pingTimeout"));
     }
 
     private static Dictionary<string, string> ParseQuery(string query)

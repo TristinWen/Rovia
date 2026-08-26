@@ -9,6 +9,19 @@ public sealed class VlessLinkParserTests
     private readonly VlessLinkParser _parser = new();
 
     [Fact]
+    public void Parse_ReadsHttpTransportSettings()
+    {
+        ProxyNode node = _parser.Parse("vless://00000000-0000-0000-0000-000000000000@example.com:443?security=tls&type=http&host=edge.example.com&path=%2Ftunnel&method=POST&idleTimeout=30s&pingTimeout=10s#http");
+
+        Assert.Equal("http", node.Transport?.Type);
+        Assert.Equal("edge.example.com", node.Transport?.Host);
+        Assert.Equal("/tunnel", node.Transport?.Path);
+        Assert.Equal("POST", node.Transport?.Method);
+        Assert.Equal("30s", node.Transport?.IdleTimeout);
+        Assert.Equal("10s", node.Transport?.PingTimeout);
+    }
+
+    [Fact]
     public void Parse_MapsRealityWebSocketAndUnknownParameters()
     {
         ProxyNode node = _parser.Parse("vless://11111111-1111-1111-1111-111111111111@example.com:443?security=reality&sni=cdn.example.com&fp=chrome&pbk=key&sid=ab&type=ws&path=%2Fproxy&host=edge.example.com&custom=value#Tokyo%201");
