@@ -49,6 +49,8 @@ Implemented and validated:
   creating a conflicting second TUN interface.
 - Verified startup fallback across resolved TLS WebSocket edge addresses and
   explicitly grouped server-provided transport alternatives.
+- Standards-compliant sing-box HTTP transport mapping with host lists, request
+  paths and methods, bounded HTTP/2 health checks, and rejection of unknown types.
 - Cross-process runtime status, speed-test, diagnostics, and clean disconnect.
 - Detached runtime ownership independent of the invoking CLI/Desktop, repeated
   backend-exit supervision, and scheduled due-provider refresh.
@@ -74,7 +76,7 @@ Last known validation baseline:
 dotnet build Rovia.sln --configuration Release
 dotnet test Rovia.sln --configuration Release --no-build
 
-58 tests passed (including opt-in installed sing-box configuration validation)
+61 tests passed (including opt-in installed sing-box configuration validation)
 0 build warnings
 0 build errors
 ```

@@ -143,11 +143,37 @@ public sealed class SingBoxConfigBuilder
 
     private static JsonObject BuildTransport(TransportOptions transport)
     {
-        JsonObject result = new() { ["type"] = transport.Type };
-        Add(result, "path", transport.Path);
-        if (!string.IsNullOrWhiteSpace(transport.Host))
-            result["headers"] = new JsonObject { ["Host"] = transport.Host };
-        Add(result, "service_name", transport.ServiceName);
+        string type = transport.Type.ToLowerInvariant();
+        JsonObject result = new() { ["type"] = type };
+        switch (type)
+        {
+            case "http":
+                Add(result, "path", transport.Path);
+                if (!string.IsNullOrWhiteSpace(transport.Host))
+                    result["host"] = new JsonArray(transport.Host);
+                Add(result, "method", transport.Method);
+                Add(result, "idle_timeout", transport.IdleTimeout);
+                Add(result, "ping_timeout", transport.PingTimeout);
+                break;
+            case "ws":
+                Add(result, "path", transport.Path);
+                if (!string.IsNullOrWhiteSpace(transport.Host))
+                    result["headers"] = new JsonObject { ["Host"] = transport.Host };
+                break;
+            case "grpc":
+                Add(result, "service_name", transport.ServiceName);
+                Add(result, "idle_timeout", transport.IdleTimeout);
+                Add(result, "ping_timeout", transport.PingTimeout);
+                break;
+            case "httpupgrade":
+                Add(result, "host", transport.Host);
+                Add(result, "path", transport.Path);
+                break;
+            case "quic":
+                break;
+            default:
+                throw new InvalidOperationException($"Unsupported transport type '{transport.Type}'.");
+        }
         return result;
     }
 

@@ -35,7 +35,7 @@ The dependency direction is intentionally constrained:
 ## Features
 
 - Backend-independent domain models and a reusable high-level routing engine.
-- VLESS parsing for TLS, Reality, flow, WebSocket, HTTP, and gRPC parameters.
+- VLESS parsing for TLS, Reality, flow, WebSocket, HTTP, HTTPUpgrade, and gRPC parameters.
 - Trojan, VMess, and SIP002 Shadowsocks parsing and sing-box mapping.
 - Plain-text and Base64 subscription import with stable deduplication.
 - Durable local JSON storage with unknown share-link parameters preserved.
@@ -115,6 +115,13 @@ the selected node first, then only the explicitly grouped alternatives. For exam
 the WebSocket and gRPC links for one service can both include
 `rovia-fallback-group=office`. Rovia accepts a candidate only after real proxied HTTP
 egress succeeds; it never guesses unsupported server transports.
+
+Standard sing-box HTTP transport is fully mapped, including `host`, `path`,
+`method`, `idleTimeout`, and `pingTimeout` share-link parameters. With TLS enabled,
+it uses the normal HTTP transport over TLS supported by sing-box. Client and server
+settings must match; adding `type=http` to an existing WebSocket-only link does not
+create a server endpoint and is not a guarantee that traffic will be treated as
+ordinary browser HTTPS by a managed network.
 
 Optional routing and DNS policy lives in `%LOCALAPPDATA%\Rovia\routing.json` (or
 under `ROVIA_DATA_DIR`). Rules are evaluated in order and deterministically mapped

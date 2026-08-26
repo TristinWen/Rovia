@@ -10,6 +10,46 @@ namespace Rovia.Backends.Tests;
 public sealed class SingBoxConfigBuilderTests
 {
     [Fact]
+    public void Build_MapsHttpTransportUsingSingBoxHttpFields()
+    {
+        ProxyNode node = new()
+        {
+            Host        = "edge.example.com",
+            Port        = 443,
+            Protocol    = ProxyProtocol.Vless,
+            Credentials = new("00000000-0000-0000-0000-000000000000"),
+            Tls         = new(true, "edge.example.com"),
+            Transport   = new("http", "/tunnel", "edge.example.com", Method: "POST", IdleTimeout: "30s", PingTimeout: "10s")
+        };
+
+        using JsonDocument document = JsonDocument.Parse(new SingBoxConfigBuilder().Build(node, new SingBoxOptions()));
+        JsonElement transport = document.RootElement.GetProperty("outbounds")[0].GetProperty("transport");
+
+        Assert.Equal("http", transport.GetProperty("type").GetString());
+        Assert.Equal("edge.example.com", transport.GetProperty("host")[0].GetString());
+        Assert.Equal("/tunnel", transport.GetProperty("path").GetString());
+        Assert.Equal("POST", transport.GetProperty("method").GetString());
+        Assert.Equal("30s", transport.GetProperty("idle_timeout").GetString());
+        Assert.False(transport.TryGetProperty("headers", out _));
+    }
+
+    [Fact]
+    public void Build_RejectsUnknownTransportType()
+    {
+        ProxyNode node = new()
+        {
+            Host        = "edge.example.com",
+            Port        = 443,
+            Protocol    = ProxyProtocol.Vless,
+            Credentials = new("00000000-0000-0000-0000-000000000000"),
+            Transport   = new("masque")
+        };
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => new SingBoxConfigBuilder().Build(node, new SingBoxOptions()));
+
+        Assert.Contains("Unsupported transport type", exception.Message);
+    }
+    [Fact]
     public void Build_MapsVlessRealityAndWebSocket()
     {
         ProxyNode node = new()
