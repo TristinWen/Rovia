@@ -1,31 +1,30 @@
 using System.IO.Compression;
-using System.Net.Http.Json;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text.Json.Serialization;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Rovia.Backends.Xray;
 
 /// <summary>Installs an official Xray release after verifying its published SHA-256 digest.</summary>
 public sealed class XrayProvisioner(HttpClient? httpClient = null)
 {
-    private static readonly Uri LatestReleaseUri = new("https://api.github.com/repos/XTLS/Xray-core/releases/latest");
-    private readonly HttpClient _httpClient       = httpClient ?? CreateHttpClient();
+    private static readonly Uri LatestReleaseUri = new("https://github.com/XTLS/Xray-core/releases/latest/download/");
+    private readonly HttpClient _httpClient      = httpClient ?? CreateHttpClient();
 
     public async Task<string> EnsureAsync(string dataDirectory, CancellationToken cancellationToken = default)
     {
         string targetPath = Path.Combine(dataDirectory, "bin", OperatingSystem.IsWindows() ? "xray.exe" : "xray");
         if (File.Exists(targetPath))
             return targetPath;
-        Release release    = await GetReleaseAsync(cancellationToken);
-        string assetName   = $"Xray-{GetPlatform()}-{GetArchitecture()}.zip";
-        Asset asset        = release.Assets.SingleOrDefault(item => item.Name.Equals(assetName, StringComparison.OrdinalIgnoreCase))
-            ?? throw new PlatformNotSupportedException($"The latest Xray release has no asset named '{assetName}'.");
-        byte[] archive     = await _httpClient.GetByteArrayAsync(asset.DownloadUrl, cancellationToken);
-        string? expected   = asset.Digest?.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase) == true ? asset.Digest[7..] : null;
-        if (expected is null)
-            throw new InvalidDataException("The official Xray release asset does not provide a SHA-256 digest.");
-        string actual = Convert.ToHexString(SHA256.HashData(archive));
+        string assetName = $"Xray-{GetPlatform()}-{GetArchitecture()}.zip";
+        byte[] archive   = await _httpClient.GetByteArrayAsync(new Uri(LatestReleaseUri, assetName), cancellationToken);
+        byte[] digest    = await _httpClient.GetByteArrayAsync(new Uri(LatestReleaseUri, $"{assetName}.dgst"), cancellationToken);
+        Match match      = Regex.Match(Encoding.UTF8.GetString(digest), @"^SHA2-256=\s*([0-9a-f]{64})\s*$", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+        if (!match.Success)
+            throw new InvalidDataException("The official Xray digest file does not contain SHA2-256.");
+        string expected = match.Groups[1].Value;
+        string actual   = Convert.ToHexString(SHA256.HashData(archive));
         if (!actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
             throw new InvalidDataException("The downloaded Xray archive failed SHA-256 verification.");
 
@@ -49,14 +48,6 @@ public sealed class XrayProvisioner(HttpClient? httpClient = null)
         return targetPath;
     }
 
-    private async Task<Release> GetReleaseAsync(CancellationToken cancellationToken)
-    {
-        using HttpResponseMessage response = await _httpClient.GetAsync(LatestReleaseUri, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<Release>(cancellationToken)
-            ?? throw new InvalidDataException("GitHub returned an invalid Xray release document.");
-    }
-
     private static string GetPlatform() => OperatingSystem.IsWindows() ? "windows"
         : OperatingSystem.IsLinux() ? "linux"
         : OperatingSystem.IsMacOS() ? "macos" : throw new PlatformNotSupportedException();
@@ -76,10 +67,4 @@ public sealed class XrayProvisioner(HttpClient? httpClient = null)
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         return client;
     }
-
-    private sealed record Release([property: JsonPropertyName("assets")] IReadOnlyList<Asset> Assets);
-    private sealed record Asset(
-        [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("browser_download_url")] Uri DownloadUrl,
-        [property: JsonPropertyName("digest")] string? Digest);
 }
