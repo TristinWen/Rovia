@@ -6,6 +6,8 @@ to existing backends such as sing-box and Xray.
 
 See [ROADMAP.md](ROADMAP.md) for architecture constraints, current limitations,
 new-machine setup, prioritized milestones, and handoff requirements.
+See [docs/ANDROID.md](docs/ANDROID.md) for the native Android architecture and
+release path.
 
 ## Architecture
 
