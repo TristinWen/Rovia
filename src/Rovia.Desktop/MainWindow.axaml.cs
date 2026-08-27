@@ -293,7 +293,6 @@ public partial class MainWindow : Window
             catch (IOException) { }
         }
         UpdateStatusIndicator(state);
-        AppendLiveLogs(state);
         SetMessage(state?.LastMessage ?? "Ready.");
         ShowPerformance(state);
     }
@@ -328,19 +327,18 @@ public partial class MainWindow : Window
             return;
         try
         {
-            state = await new RuntimeControlClient($"rovia-{Environment.UserName}").SendAsync("status");
-            AppendLiveLogs(state);
+            IReadOnlyList<RuntimeLiveLogEntry> entries = await new RuntimeControlClient($"rovia-{Environment.UserName}")
+                .ReadLiveLogsAsync(_lastLiveLogSequence);
+            AppendLiveLogs(entries);
         }
         catch (Exception exception) when (exception is IOException or OperationCanceledException or TimeoutException)
         {
         }
     }
 
-    private void AppendLiveLogs(RuntimeState? state)
+    private void AppendLiveLogs(IReadOnlyList<RuntimeLiveLogEntry> entries)
     {
-        if (state is null)
-            return;
-        foreach (RuntimeLiveLogEntry entry in state.LiveLogs.Where(entry => entry.Sequence > _lastLiveLogSequence))
+        foreach (RuntimeLiveLogEntry entry in entries)
         {
             AppendLog(entry.Level, entry.Message);
             _lastLiveLogSequence = entry.Sequence;

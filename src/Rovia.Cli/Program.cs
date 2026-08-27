@@ -335,8 +335,7 @@ internal static class RoviaCli
             NodeName = engine.CurrentNode is null ? null : DisplayName(engine.CurrentNode), LocalEndpoint = status.LocalEndpoint?.ToString(),
             FailoverState = engine.FailoverState, StartedAt = startedAt, UpdatedAt = DateTimeOffset.UtcNow,
             LastMessage = performance?.Message ?? runtimeMessage,
-            ProxyLatencyMs = performance?.LatencyMs, DownloadMbps = performance?.DownloadMbps, PerformanceAt = performance?.MeasuredAt,
-            LiveLogs = liveLogs.Snapshot()
+            ProxyLatencyMs = performance?.LatencyMs, DownloadMbps = performance?.DownloadMbps, PerformanceAt = performance?.MeasuredAt
         };
         engine.RouteChanged += async (_, eventArgs) =>
         {
@@ -353,7 +352,7 @@ internal static class RoviaCli
             performance = await performanceProbe.MeasureAsync(status.LocalEndpoint!, token);
             stateStore.Write(State());
         }
-        RuntimeControlServer server = new(pipeName, State, exit.Cancel, MeasurePerformance);
+        RuntimeControlServer server = new(pipeName, State, exit.Cancel, MeasurePerformance, liveLogs.Since);
         Task serverTask             = server.RunAsync(exit.Token);
         RouteEvaluationSignal evaluationSignal = new();
         AdaptiveRouteMonitor monitor = new(engine, new RouteHistoryStore(historyPath), TimeSpan.FromSeconds(30),

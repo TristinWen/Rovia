@@ -1,5 +1,6 @@
 using System.IO.Pipes;
 using System.Text.Json;
+using Rovia.Runtime.Diagnostics;
 
 namespace Rovia.Runtime.Runtime;
 
@@ -8,7 +9,8 @@ public sealed class RuntimeControlServer(
     string pipeName,
     Func<RuntimeState> stateProvider,
     Action stopRequested,
-    Func<CancellationToken, Task>? speedTestRequested = null)
+    Func<CancellationToken, Task>? speedTestRequested = null,
+    Func<long, IReadOnlyList<RuntimeLiveLogEntry>>? liveLogProvider = null)
 {
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
@@ -20,6 +22,12 @@ public sealed class RuntimeControlServer(
             using StreamReader reader = new(pipe, leaveOpen: true);
             await using StreamWriter writer = new(pipe, leaveOpen: true) { AutoFlush = true };
             string command = (await reader.ReadLineAsync(cancellationToken) ?? string.Empty).Trim().ToLowerInvariant();
+            if (command.StartsWith("live-logs ", StringComparison.Ordinal) && liveLogProvider is not null)
+            {
+                long.TryParse(command[10..], out long sequence);
+                await writer.WriteLineAsync(JsonSerializer.Serialize(liveLogProvider(sequence)).AsMemory(), cancellationToken);
+                continue;
+            }
             if (command == "speed-test" && speedTestRequested is not null)
                 await speedTestRequested(cancellationToken);
             RuntimeState state = command is "status" or "disconnect" or "speed-test"

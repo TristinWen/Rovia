@@ -29,6 +29,12 @@ public sealed class RuntimeLiveLogBuffer(int capacity = 500)
         lock (_sync)
             return _entries.ToArray();
     }
+
+    public IReadOnlyList<RuntimeLiveLogEntry> Since(long sequence)
+    {
+        lock (_sync)
+            return _entries.Where(entry => entry.Sequence > sequence).ToArray();
+    }
 }
 
 /// <summary>Represents one transient backend log line exposed to the desktop.</summary>

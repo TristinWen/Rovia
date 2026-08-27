@@ -20,5 +20,6 @@ public sealed class RuntimeLiveLogBufferTests
         Assert.Contains("?[redacted]", entries[0].Message);
         Assert.DoesNotContain("11111111", entries[1].Message);
         Assert.Equal([2L, 3L], entries.Select(entry => entry.Sequence));
+        Assert.Single(buffer.Since(2));
     }
 }

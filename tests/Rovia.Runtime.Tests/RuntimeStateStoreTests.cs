@@ -1,5 +1,4 @@
 using Rovia.Runtime.Runtime;
-using Rovia.Runtime.Diagnostics;
 
 namespace Rovia.Runtime.Tests;
 
@@ -48,26 +47,4 @@ public sealed class RuntimeStateStoreTests
         }
     }
 
-    [Fact]
-    public void Write_DoesNotPersistTransientBackendLogs()
-    {
-        string directory = Path.Combine(Path.GetTempPath(), $"rovia-runtime-{Guid.NewGuid():N}");
-        string path      = Path.Combine(directory, "state.json");
-        try
-        {
-            RuntimeStateStore store = new(path);
-            store.Write(new RuntimeState
-            {
-                LiveLogs = [new RuntimeLiveLogEntry(1, DateTimeOffset.UtcNow, "INFO", "accepted example.com:443")]
-            });
-
-            Assert.Empty(store.Read()!.LiveLogs);
-            Assert.DoesNotContain("example.com", File.ReadAllText(path));
-        }
-        finally
-        {
-            if (Directory.Exists(directory))
-                Directory.Delete(directory, true);
-        }
-    }
 }
