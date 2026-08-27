@@ -5,8 +5,12 @@ using Rovia.Core.Models;
 namespace Rovia.Backends.Xray;
 
 /// <summary>Runs Xray for VLESS XHTTP while exposing a local HTTP proxy.</summary>
-public sealed class XrayBackend(XrayOptions options, XrayConfigBuilder configBuilder) : IProxyBackend
+public sealed class XrayBackend(
+    XrayOptions options,
+    XrayConfigBuilder configBuilder,
+    BackendReadinessProbe? readinessProbe = null) : IProxyBackend
 {
+    private readonly BackendReadinessProbe _readinessProbe = readinessProbe ?? new();
     private Process? _process;
     private string?  _nodeId;
     private string?  _lastError;
@@ -38,7 +42,17 @@ public sealed class XrayBackend(XrayOptions options, XrayConfigBuilder configBui
             throw new InvalidOperationException("Unable to start Xray.");
         _process.BeginErrorReadLine();
         _process.BeginOutputReadLine();
-        _nodeId = node.Id;
+        try
+        {
+            await _readinessProbe.WaitAsync(options.ListenAddress, options.ListenPort,
+                () => _process.HasExited, () => _lastError, "Xray", cancellationToken);
+            _nodeId = node.Id;
+        }
+        catch
+        {
+            await StopAsync(CancellationToken.None);
+            throw;
+        }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
