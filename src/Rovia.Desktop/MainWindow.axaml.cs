@@ -128,6 +128,7 @@ public partial class MainWindow : Window
             if (state is { IsRunning: true })
                 throw new InvalidOperationException("Rovia is already connected.");
             string cliPath = FindCliPath();
+            await EnsureRuntimeCompatibilityAsync(cliPath);
             _lastLiveLogSequence = 0;
             AppendLog("INFO", $"Starting runtime: {cliPath} {command}");
             ProcessStartInfo startInfo = new(cliPath, command)
@@ -295,6 +296,29 @@ public partial class MainWindow : Window
         AppendLiveLogs(state);
         SetMessage(state?.LastMessage ?? "Ready.");
         ShowPerformance(state);
+    }
+
+    private static async Task EnsureRuntimeCompatibilityAsync(string cliPath)
+    {
+        ProcessStartInfo startInfo = new(cliPath, "runtime-info")
+        {
+            UseShellExecute        = false,
+            CreateNoWindow         = true,
+            RedirectStandardError  = true,
+            RedirectStandardOutput = true
+        };
+        using Process process = Process.Start(startInfo) ?? throw new InvalidOperationException("Unable to inspect the Rovia runtime.");
+        string output = await process.StandardOutput.ReadToEndAsync();
+        string error  = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        if (process.ExitCode != 0)
+            throw new InvalidOperationException($"The packaged runtime is incompatible or outdated. Re-publish Rovia. {error.Trim()}".Trim());
+        RuntimeProtocolInfo? info;
+        try { info = JsonSerializer.Deserialize<RuntimeProtocolInfo>(output); }
+        catch (JsonException) { info = null; }
+        if (info?.ProtocolVersion != RuntimeProtocol.Version)
+            throw new InvalidOperationException(
+                $"The packaged runtime protocol is {info?.ProtocolVersion.ToString() ?? "unknown"}, but Desktop requires {RuntimeProtocol.Version}. Re-publish Rovia.");
     }
 
     private async Task RefreshLiveLogsAsync()

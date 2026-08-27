@@ -66,6 +66,7 @@ internal static class RoviaCli
                 "export-diagnostics" => ExportDiagnostics(args, dataDirectory),
                 "check-config" => CheckConfig(args, repository, dataDirectory),
                 "xhttp-profiles" => GenerateXhttpProfiles(args, repository),
+                "runtime-info" => ShowRuntimeInfo(),
                 _              => Unknown(args[0])
             };
         }
@@ -548,6 +549,13 @@ internal static class RoviaCli
         return 0;
     }
 
+    private static int ShowRuntimeInfo()
+    {
+        string version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "unknown";
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new RuntimeProtocolInfo(RuntimeProtocol.Version, version)));
+        return 0;
+    }
+
     private static int ExportDiagnostics(string[] args, string dataDirectory)
     {
         string destination = args.Length >= 2
@@ -623,6 +631,7 @@ internal static class RoviaCli
           rovia rank
           rovia check-config <node-id>
           rovia xhttp-profiles <node-id>
+          rovia runtime-info
           rovia connect <node-id>
           rovia connect-auto
           rovia status
