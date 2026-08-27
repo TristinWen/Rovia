@@ -75,6 +75,32 @@ public sealed class SingBoxConfigBuilderTests
     }
 
     [Fact]
+    public void Build_MapsXhttpTransport()
+    {
+        ProxyNode node = new()
+        {
+            Id = "node", Protocol = ProxyProtocol.Vless, Host = "example.com", Port = 443,
+            Credentials = new("11111111-1111-1111-1111-111111111111"),
+            Tls = new(true, "example.com"),
+            Transport = new("xhttp", "/api/v1/stream", "example.com", null, null, null, null, null,
+                "auto", new ByteRange(100, 1000), new ByteRange(1_000_000, 1_000_000))
+        };
+
+        string json = new SingBoxConfigBuilder().Build(node, new SingBoxOptions());
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement transport = document.RootElement.GetProperty("outbounds")[0].GetProperty("transport");
+
+        Assert.Equal("xhttp", transport.GetProperty("type").GetString());
+        Assert.Equal("example.com", transport.GetProperty("host").GetString());
+        Assert.Equal("/api/v1/stream", transport.GetProperty("path").GetString());
+        Assert.Equal("auto", transport.GetProperty("mode").GetString());
+        Assert.Equal(100,  transport.GetProperty("x_padding_bytes").GetProperty("from").GetInt32());
+        Assert.Equal(1000, transport.GetProperty("x_padding_bytes").GetProperty("to").GetInt32());
+        Assert.Equal(1_000_000, transport.GetProperty("sc_max_each_post_bytes").GetProperty("from").GetInt32());
+        Assert.Equal(1_000_000, transport.GetProperty("sc_max_each_post_bytes").GetProperty("to").GetInt32());
+    }
+
+    [Fact]
     public void Build_AddsTunInboundOnlyWhenRequested()
     {
         ProxyNode node = new() { Protocol = ProxyProtocol.Vless, Host = "example.com", Port = 443, Credentials = new("11111111-1111-1111-1111-111111111111") };

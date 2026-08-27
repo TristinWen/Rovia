@@ -14,13 +14,27 @@ internal static class LinkQuery
     public static TransportOptions? Transport(IReadOnlyDictionary<string, string> query)
     {
         string type = query.GetValueOrDefault("type") ?? "tcp";
-        return type.Equals("tcp", StringComparison.OrdinalIgnoreCase) ? null
-            : new(type,
-                query.GetValueOrDefault("path"),
-                query.GetValueOrDefault("host"),
-                query.GetValueOrDefault("serviceName"),
-                query.GetValueOrDefault("method"),
-                query.GetValueOrDefault("idleTimeout"),
-                query.GetValueOrDefault("pingTimeout"));
+        if (type.Equals("tcp", StringComparison.OrdinalIgnoreCase))
+            return null;
+        ByteRange? padding = ParseByteRange(query.GetValueOrDefault("xPaddingFrom"), query.GetValueOrDefault("xPaddingTo"));
+        ByteRange? post    = ParseByteRange(query.GetValueOrDefault("scPostFrom"), query.GetValueOrDefault("scPostTo"));
+        return new(type,
+            query.GetValueOrDefault("path"),
+            query.GetValueOrDefault("host"),
+            query.GetValueOrDefault("serviceName"),
+            query.GetValueOrDefault("method"),
+            query.GetValueOrDefault("idleTimeout"),
+            query.GetValueOrDefault("pingTimeout"),
+            null,
+            query.GetValueOrDefault("mode"),
+            padding,
+            post);
+    }
+
+    private static ByteRange? ParseByteRange(string? from, string? to)
+    {
+        if (int.TryParse(from, out int f) && int.TryParse(to, out int t))
+            return new ByteRange(f, t);
+        return null;
     }
 }

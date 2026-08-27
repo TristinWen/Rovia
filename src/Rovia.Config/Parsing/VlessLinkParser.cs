@@ -9,7 +9,7 @@ public sealed class VlessLinkParser : IProxyLinkParser
     private static readonly HashSet<string> KnownParameters = new(StringComparer.OrdinalIgnoreCase)
     {
         "security", "sni", "fp", "pbk", "sid", "flow", "type", "path", "host", "serviceName", "encryption",
-        "method", "idleTimeout", "pingTimeout"
+        "method", "idleTimeout", "pingTimeout", "mode", "xPaddingFrom", "xPaddingTo", "scPostFrom", "scPostTo"
     };
 
     public bool CanParse(string input) => input.StartsWith("vless://", StringComparison.OrdinalIgnoreCase);
@@ -53,15 +53,21 @@ public sealed class VlessLinkParser : IProxyLinkParser
     private static TransportOptions? BuildTransport(IReadOnlyDictionary<string, string> parameters)
     {
         string? type = Get(parameters, "type");
-        return string.IsNullOrWhiteSpace(type) || type.Equals("tcp", StringComparison.OrdinalIgnoreCase)
-            ? null
-            : new(type,
-                Get(parameters, "path"),
-                Get(parameters, "host"),
-                Get(parameters, "serviceName"),
-                Get(parameters, "method"),
-                Get(parameters, "idleTimeout"),
-                Get(parameters, "pingTimeout"));
+        if (string.IsNullOrWhiteSpace(type) || type.Equals("tcp", StringComparison.OrdinalIgnoreCase))
+            return null;
+        ByteRange? padding = ParseByteRange(Get(parameters, "xPaddingFrom"), Get(parameters, "xPaddingTo"));
+        ByteRange? post    = ParseByteRange(Get(parameters, "scPostFrom"), Get(parameters, "scPostTo"));
+        return new(type,
+            Get(parameters, "path"),
+            Get(parameters, "host"),
+            Get(parameters, "serviceName"),
+            Get(parameters, "method"),
+            Get(parameters, "idleTimeout"),
+            Get(parameters, "pingTimeout"),
+            null,
+            Get(parameters, "mode"),
+            padding,
+            post);
     }
 
     private static Dictionary<string, string> ParseQuery(string query)
@@ -78,4 +84,11 @@ public sealed class VlessLinkParser : IProxyLinkParser
 
     private static string? Get(IReadOnlyDictionary<string, string> values, string key) =>
         values.TryGetValue(key, out string? value) && !string.IsNullOrWhiteSpace(value) ? value : null;
+
+    private static ByteRange? ParseByteRange(string? from, string? to)
+    {
+        if (int.TryParse(from, out int f) && int.TryParse(to, out int t))
+            return new ByteRange(f, t);
+        return null;
+    }
 }
