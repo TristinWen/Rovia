@@ -6,6 +6,8 @@ namespace Rovia.Runtime.Runtime;
 /// <summary>Validates local runtime prerequisites before starting a proxy backend.</summary>
 public static class RuntimePreflight
 {
+    private static readonly string[] GeneratedConfigNames = ["sing-box.json", "xray.json"];
+
     public static void EnsurePortAvailable(int port)
     {
         if (port is < 1 or > 65535)
@@ -36,5 +38,24 @@ public static class RuntimePreflight
         }
         catch (ArgumentException) { return false; }
         catch (InvalidOperationException) { return false; }
+    }
+
+    public static int DeleteGeneratedConfigs(string runtimeDirectory)
+    {
+        int deleted = 0;
+        foreach (string name in GeneratedConfigNames)
+        {
+            string path = Path.Combine(runtimeDirectory, name);
+            try
+            {
+                if (!File.Exists(path))
+                    continue;
+                File.Delete(path);
+                deleted++;
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        return deleted;
     }
 }

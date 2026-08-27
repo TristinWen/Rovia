@@ -43,12 +43,12 @@ public sealed class SingBoxBackend(
         _process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
         _process.ErrorDataReceived += (_, eventArgs) => Capture("WARN", eventArgs.Data);
         _process.OutputDataReceived += (_, eventArgs) => Capture("INFO", eventArgs.Data);
-        if (!_process.Start())
-            throw new InvalidOperationException("Unable to start sing-box.");
-        _process.BeginErrorReadLine();
-        _process.BeginOutputReadLine();
         try
         {
+            if (!_process.Start())
+                throw new InvalidOperationException("Unable to start sing-box.");
+            _process.BeginErrorReadLine();
+            _process.BeginOutputReadLine();
             await _readinessProbe.WaitAsync(options.ListenAddress, options.ListenPort,
                 () => _process.HasExited, () => _lastError, "sing-box", cancellationToken);
             _nodeId = node.Id;
@@ -62,16 +62,24 @@ public sealed class SingBoxBackend(
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        if (_process is null)
-            return;
-        if (!_process.HasExited)
+        try
         {
-            _process.Kill(true);
-            await _process.WaitForExitAsync(cancellationToken);
+            if (_process is null)
+                return;
+            try
+            {
+                if (!_process.HasExited)
+                {
+                    _process.Kill(true);
+                    await _process.WaitForExitAsync(cancellationToken);
+                }
+            }
+            catch (InvalidOperationException) { }
+            _process.Dispose();
+            _process = null;
+            _nodeId  = null;
         }
-        _process.Dispose();
-        _process = null;
-        _nodeId  = null;
+        finally { DeleteRuntimeConfig(); }
     }
 
     public async Task SwitchNodeAsync(ProxyNode node, CancellationToken cancellationToken = default)
@@ -97,5 +105,12 @@ public sealed class SingBoxBackend(
         string classified = BackendLogLevel.Classify(level, message);
         _lastError = classified is "WARN" or "ERROR" ? message : _lastError;
         liveLog?.Invoke(classified, message);
+    }
+
+    private void DeleteRuntimeConfig()
+    {
+        try { File.Delete(Path.Combine(options.WorkingDirectory, "sing-box.json")); }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 }

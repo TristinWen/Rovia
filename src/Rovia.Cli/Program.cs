@@ -574,7 +574,8 @@ internal static class RoviaCli
         {
             bool backendStopped = RuntimePreflight.StopOrphanedBackend(stale);
             bool proxyRestored  = OperatingSystem.IsWindows() && SystemProxyLease.RestorePending(new WindowsSystemProxySettings(), snapshotPath);
-            if (backendStopped || proxyRestored)
+            int configsDeleted  = RuntimePreflight.DeleteGeneratedConfigs(Path.Combine(dataDirectory, "runtime"));
+            if (backendStopped || proxyRestored || configsDeleted > 0)
                 store.Write(stale with { UpdatedAt = DateTimeOffset.UtcNow, LastMessage = "Recovered resources left by an interrupted runtime." });
         }
     }
