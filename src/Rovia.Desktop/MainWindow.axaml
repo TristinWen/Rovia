@@ -12,6 +12,8 @@
         <MenuItem Header="_Import link..." Click="ImportLinkClicked" />
         <MenuItem Header="Import _subscription..." Click="ImportSubscriptionMenuItemClicked" />
         <Separator />
+        <MenuItem Header="_Delete selected connection..." Click="DeleteClicked" InputGesture="Delete" />
+        <Separator />
         <MenuItem Header="_Clear log" Click="ClearLogClicked" />
         <Separator />
         <MenuItem Header="E_xit" Click="ExitClicked" />
@@ -63,7 +65,12 @@
 
     <Grid Grid.Row="3" ColumnDefinitions="300,*" Margin="0,0,0,16">
       <Border Grid.Column="0" BorderBrush="#334155" BorderThickness="1" CornerRadius="8">
-        <ListBox x:Name="NodeList">
+        <ListBox x:Name="NodeList" KeyDown="NodeListKeyDown">
+          <ListBox.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="Delete selected connection..." Click="DeleteClicked" />
+            </ContextMenu>
+          </ListBox.ContextMenu>
           <ListBox.ItemTemplate>
             <DataTemplate>
               <Grid ColumnDefinitions="*,Auto" Margin="8">

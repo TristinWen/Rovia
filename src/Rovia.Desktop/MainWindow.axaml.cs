@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Input;
 using Avalonia.Media;
 using Rovia.Config.Parsing;
 using Rovia.Config.Storage;
@@ -163,13 +164,33 @@ public partial class MainWindow : Window
         }
     }
 
-    private void DeleteClicked(object? sender, RoutedEventArgs eventArgs)
+    private async void DeleteClicked(object? sender, RoutedEventArgs eventArgs) => await DeleteSelectedAsync();
+
+    private async void NodeListKeyDown(object? sender, KeyEventArgs eventArgs)
+    {
+        if (eventArgs.Key != Key.Delete)
+            return;
+        eventArgs.Handled = true;
+        await DeleteSelectedAsync();
+    }
+
+    private async Task DeleteSelectedAsync()
     {
         if (NodeList.SelectedItem is not NodeItem selected)
         {
-            SetMessage("Select a node to delete.");
+            SetMessage("Select a connection to delete.");
             return;
         }
+        RuntimeState? state = new RuntimeStateStore(Path.Combine(_dataDirectory, "runtime-state.json")).Read();
+        if (state is { IsRunning: true } && state.NodeId == selected.Id)
+        {
+            SetMessage("Disconnect the selected connection before deleting it.");
+            return;
+        }
+        bool confirmed = await ConfirmationDialog.ShowAsync(this, "Delete connection",
+            $"Delete '{selected.Name}' from Rovia? This cannot be undone.", "Delete");
+        if (!confirmed)
+            return;
         _repository.Remove(selected.Id);
         ReloadNodes();
         SetMessage($"Deleted {selected.Name}.");
