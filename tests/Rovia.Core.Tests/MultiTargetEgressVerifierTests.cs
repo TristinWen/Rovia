@@ -33,10 +33,36 @@ public sealed class MultiTargetEgressVerifierTests
         Assert.Contains("second.example=Connection", result.Message);
     }
 
+    [Fact]
+    public async Task VerifyAsync_RetriesTransientStartupFailures()
+    {
+        Uri target = new("https://eventual.example/");
+        DelayedSuccessProbe probe = new();
+
+        EgressVerificationResult result = await new MultiTargetEgressVerifier(
+            probe, [target], maximumAttempts: 2, retryDelay: TimeSpan.Zero).VerifyAsync(new("http://127.0.0.1:2080"));
+
+        Assert.True(result.Success);
+        Assert.Equal(2, probe.Calls);
+    }
+
     private sealed class StubProbe(Uri? success) : IEgressProbe
     {
         public Task<EgressProbeResult> ProbeAsync(Uri proxyEndpoint, Uri target, CancellationToken cancellationToken = default) =>
             Task.FromResult(new EgressProbeResult(target == success, target, TimeSpan.FromMilliseconds(target == success ? 5 : 10),
                 target == success ? 204 : null, target == success ? EgressFailureKind.None : EgressFailureKind.Connection, "test"));
+    }
+
+    private sealed class DelayedSuccessProbe : IEgressProbe
+    {
+        public int Calls { get; private set; }
+
+        public Task<EgressProbeResult> ProbeAsync(Uri proxyEndpoint, Uri target, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            bool success = Calls > 1;
+            return Task.FromResult(new EgressProbeResult(success, target, TimeSpan.FromMilliseconds(5), success ? 204 : null,
+                success ? EgressFailureKind.None : EgressFailureKind.Connection, "test"));
+        }
     }
 }
