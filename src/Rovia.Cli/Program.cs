@@ -4,7 +4,9 @@ using System.Reflection;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using Rovia.Backends;
 using Rovia.Backends.SingBox;
+using Rovia.Backends.Xray;
 using Rovia.Config.Parsing;
 using Rovia.Config.Storage;
 using Rovia.Config.Subscriptions;
@@ -246,8 +248,7 @@ internal static class RoviaCli
                 "Cloudflare WARP is active. Use system-proxy mode so Rovia can share the WARP path without creating a conflicting second TUN interface.");
         }
         RuntimePreflight.EnsurePortAvailable(requestedOptions.ListenPort);
-        string singBoxPath = await new SingBoxProvisioner().EnsureAsync(dataDirectory);
-        await using AdaptiveRouteEngine engine = CreateEngine(repository, dataDirectory, singBoxPath);
+        await using AdaptiveRouteEngine engine = CreateEngine(repository, dataDirectory);
         IReadOnlyList<ProxyNode> candidates;
         if (automatic)
         {
@@ -360,7 +361,7 @@ internal static class RoviaCli
             log.Write("Error", "runtime.backend-exited", message);
             exit.Cancel();
         }, exit.Token);
-        SingBoxOptions activeOptions = CreateOptions(dataDirectory, singBoxPath);
+        SingBoxOptions activeOptions = CreateOptions(dataDirectory);
         IDisposable? proxyLease      = OperatingSystem.IsWindows() && activeOptions.Mode == SingBoxConnectionMode.SystemProxy
             ? SystemProxyLease.Activate(new WindowsSystemProxySettings(), snapshotPath, $"127.0.0.1:{activeOptions.ListenPort}")
             : null;
@@ -525,7 +526,9 @@ internal static class RoviaCli
     {
         RequireArguments(args, 2, "check-config requires a node identifier.");
         ProxyNode node = repository.Get(args[1]) ?? throw new InvalidOperationException($"Node '{args[1]}' was not found.");
-        string json = new SingBoxConfigBuilder().Build(node, CreateOptions(dataDirectory));
+        string json = node.Transport?.Type.Equals("xhttp", StringComparison.OrdinalIgnoreCase) == true
+            ? new XrayConfigBuilder().Build(node, CreateXrayOptions(dataDirectory))
+            : new SingBoxConfigBuilder().Build(node, CreateOptions(dataDirectory));
         Console.WriteLine(json);
         return 0;
     }
@@ -554,11 +557,11 @@ internal static class RoviaCli
         }
     }
 
-    private static AdaptiveRouteEngine CreateEngine(JsonNodeRepository repository, string dataDirectory, string? singBoxPath = null)
+    private static AdaptiveRouteEngine CreateEngine(JsonNodeRepository repository, string dataDirectory)
     {
-        SingBoxOptions options = CreateOptions(dataDirectory, singBoxPath);
+        SingBoxOptions options = CreateOptions(dataDirectory);
         return new(repository, new HealthMonitor(new TcpNodeProbe()), new RouteScorer(), new RouteSelector(),
-            new FailoverEngine(), new SingBoxBackend(options, new SingBoxConfigBuilder()), new RoutingPolicy());
+            new FailoverEngine(), new ProxyBackendRouter(dataDirectory, options, CreateXrayOptions(dataDirectory)), new RoutingPolicy());
     }
 
     private static SingBoxOptions CreateOptions(string dataDirectory, string? singBoxPath = null)
@@ -576,6 +579,14 @@ internal static class RoviaCli
             LogLevel         = Environment.GetEnvironmentVariable("ROVIA_LOG_LEVEL") ?? "info",
         };
     }
+
+    private static XrayOptions CreateXrayOptions(string dataDirectory) => new()
+    {
+        ExecutablePath   = Environment.GetEnvironmentVariable("ROVIA_XRAY") ?? "xray",
+        WorkingDirectory = Path.Combine(dataDirectory, "runtime"),
+        ListenPort       = int.TryParse(Environment.GetEnvironmentVariable("ROVIA_LISTEN_PORT"), out int port) ? port : 2080,
+        LogLevel         = Environment.GetEnvironmentVariable("ROVIA_LOG_LEVEL") ?? "warning"
+    };
 
     private static string DisplayName(ProxyNode node) => string.IsNullOrWhiteSpace(node.Name) ? node.Host : node.Name;
     private static string FormatMs(double? value) => value.HasValue ? $"{value:0.0} ms" : "unreachable";

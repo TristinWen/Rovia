@@ -45,4 +45,16 @@ public sealed class VlessLinkParserTests
         ProxyNode node = _parser.Parse("vless://11111111-1111-1111-1111-111111111111@[2001:db8::1]:8443#IPv6");
         Assert.Equal("[2001:db8::1]", node.Host);
     }
+
+    [Fact]
+    public void Parse_ReadsStandardXhttpExtraXmux()
+    {
+        string extra   = Uri.EscapeDataString("{\"xPaddingBytes\":\"100-1000\",\"xmux\":{\"maxConcurrency\":6,\"maxConnections\":2,\"cMaxReuseTimes\":24,\"hMaxRequestTimes\":150,\"hMaxReusableSecs\":90,\"hKeepAlivePeriod\":15}}");
+        ProxyNode node = _parser.Parse($"vless://11111111-1111-1111-1111-111111111111@example.com:443?security=tls&type=xhttp&mode=stream-one&extra={extra}#long");
+
+        Assert.Equal(100, node.Transport?.XPaddingBytes?.From);
+        Assert.Equal(6, node.Transport?.XhttpXmux?.MaxConcurrency);
+        Assert.Equal(24, node.Transport?.XhttpXmux?.CMaxReuseTimes);
+        Assert.Equal(15, node.Transport?.XhttpXmux?.HKeepAlivePeriod);
+    }
 }

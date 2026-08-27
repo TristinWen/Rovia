@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Rovia.Core.Models;
 
 namespace Rovia.Config.Parsing;
@@ -9,7 +10,7 @@ public sealed class VlessLinkParser : IProxyLinkParser
     private static readonly HashSet<string> KnownParameters = new(StringComparer.OrdinalIgnoreCase)
     {
         "security", "sni", "fp", "pbk", "sid", "flow", "type", "path", "host", "serviceName", "encryption",
-        "method", "idleTimeout", "pingTimeout", "mode", "xPaddingFrom", "xPaddingTo", "scPostFrom", "scPostTo"
+        "method", "idleTimeout", "pingTimeout", "mode", "extra", "xPaddingFrom", "xPaddingTo", "scPostFrom", "scPostTo"
     };
 
     public bool CanParse(string input) => input.StartsWith("vless://", StringComparison.OrdinalIgnoreCase);
@@ -57,6 +58,7 @@ public sealed class VlessLinkParser : IProxyLinkParser
             return null;
         ByteRange? padding = ParseByteRange(Get(parameters, "xPaddingFrom"), Get(parameters, "xPaddingTo"));
         ByteRange? post    = ParseByteRange(Get(parameters, "scPostFrom"), Get(parameters, "scPostTo"));
+        ParsedXhttpExtra extra = ParseXhttpExtra(Get(parameters, "extra"));
         return new(type,
             Get(parameters, "path"),
             Get(parameters, "host"),
@@ -66,8 +68,9 @@ public sealed class VlessLinkParser : IProxyLinkParser
             Get(parameters, "pingTimeout"),
             null,
             Get(parameters, "mode"),
-            padding,
-            post);
+            padding ?? extra.Padding,
+            post ?? extra.PostSize,
+            extra.Xmux);
     }
 
     private static Dictionary<string, string> ParseQuery(string query)
@@ -91,4 +94,55 @@ public sealed class VlessLinkParser : IProxyLinkParser
             return new ByteRange(f, t);
         return null;
     }
+
+    private static ParsedXhttpExtra ParseXhttpExtra(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return new();
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(value);
+            JsonElement root             = document.RootElement;
+            ByteRange? padding           = ReadRange(root, "xPaddingBytes");
+            ByteRange? postSize          = ReadRange(root, "scMaxEachPostBytes");
+            if (!root.TryGetProperty("xmux", out JsonElement xmux) || xmux.ValueKind != JsonValueKind.Object)
+                return new(padding, postSize);
+            return new(padding, postSize, new(
+                ReadInt(xmux, "maxConcurrency"),
+                ReadInt(xmux, "maxConnections"),
+                ReadInt(xmux, "cMaxReuseTimes"),
+                ReadInt(xmux, "hMaxRequestTimes"),
+                ReadInt(xmux, "hMaxReusableSecs"),
+                ReadInt(xmux, "hKeepAlivePeriod")));
+        }
+        catch (JsonException exception)
+        {
+            throw new ProxyLinkParseException($"The XHTTP extra parameter is not valid JSON: {exception.Message}");
+        }
+    }
+
+    private static ByteRange? ReadRange(JsonElement parent, string name)
+    {
+        if (!parent.TryGetProperty(name, out JsonElement value))
+            return null;
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int exact))
+            return new(exact, exact);
+        if (value.ValueKind != JsonValueKind.String)
+            return null;
+        string[] parts = (value.GetString() ?? string.Empty).Split('-', 2);
+        return int.TryParse(parts[0], out int from) && int.TryParse(parts[^1], out int to) ? new(from, to) : null;
+    }
+
+    private static int? ReadInt(JsonElement parent, string name)
+    {
+        if (!parent.TryGetProperty(name, out JsonElement value))
+            return null;
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number))
+            return number;
+        if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out number))
+            return number;
+        return null;
+    }
+
+    private sealed record ParsedXhttpExtra(ByteRange? Padding = null, ByteRange? PostSize = null, XhttpXmuxOptions? Xmux = null);
 }

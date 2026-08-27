@@ -181,14 +181,7 @@ public sealed class SingBoxConfigBuilder
             case "quic":
                 break;
             case "xhttp":
-                Add(result, "host", transport.Host);
-                Add(result, "path", transport.Path);
-                Add(result, "mode", transport.XhttpMode);
-                if (transport.XPaddingBytes is not null)
-                    result["x_padding_bytes"] = new JsonObject { ["from"] = transport.XPaddingBytes.From, ["to"] = transport.XPaddingBytes.To };
-                if (transport.SCMaxEachPostBytes is not null)
-                    result["sc_max_each_post_bytes"] = new JsonObject { ["from"] = transport.SCMaxEachPostBytes.From, ["to"] = transport.SCMaxEachPostBytes.To };
-                break;
+                throw new NotSupportedException("sing-box does not support XHTTP transport. Rovia must route this node through Xray.");
             default:
                 throw new InvalidOperationException($"Unsupported transport type '{transport.Type}'.");
         }

@@ -75,7 +75,7 @@ public sealed class SingBoxConfigBuilderTests
     }
 
     [Fact]
-    public void Build_MapsXhttpTransport()
+    public void Build_RejectsXhttpTransport()
     {
         ProxyNode node = new()
         {
@@ -86,18 +86,8 @@ public sealed class SingBoxConfigBuilderTests
                 "auto", new ByteRange(100, 1000), new ByteRange(1_000_000, 1_000_000))
         };
 
-        string json = new SingBoxConfigBuilder().Build(node, new SingBoxOptions());
-        using JsonDocument document = JsonDocument.Parse(json);
-        JsonElement transport = document.RootElement.GetProperty("outbounds")[0].GetProperty("transport");
-
-        Assert.Equal("xhttp", transport.GetProperty("type").GetString());
-        Assert.Equal("example.com", transport.GetProperty("host").GetString());
-        Assert.Equal("/api/v1/stream", transport.GetProperty("path").GetString());
-        Assert.Equal("auto", transport.GetProperty("mode").GetString());
-        Assert.Equal(100,  transport.GetProperty("x_padding_bytes").GetProperty("from").GetInt32());
-        Assert.Equal(1000, transport.GetProperty("x_padding_bytes").GetProperty("to").GetInt32());
-        Assert.Equal(1_000_000, transport.GetProperty("sc_max_each_post_bytes").GetProperty("from").GetInt32());
-        Assert.Equal(1_000_000, transport.GetProperty("sc_max_each_post_bytes").GetProperty("to").GetInt32());
+        NotSupportedException exception = Assert.Throws<NotSupportedException>(() => new SingBoxConfigBuilder().Build(node, new SingBoxOptions()));
+        Assert.Contains("Xray", exception.Message);
     }
 
     [Fact]
