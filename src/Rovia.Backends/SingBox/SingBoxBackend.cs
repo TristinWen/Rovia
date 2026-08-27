@@ -79,7 +79,8 @@ public sealed class SingBoxBackend(SingBoxOptions options, SingBoxConfigBuilder 
     {
         if (string.IsNullOrWhiteSpace(message))
             return;
-        _lastError = level == "WARN" ? message : _lastError;
-        liveLog?.Invoke(level, message);
+        string classified = BackendLogLevel.Classify(level, message);
+        _lastError = classified is "WARN" or "ERROR" ? message : _lastError;
+        liveLog?.Invoke(classified, message);
     }
 }
