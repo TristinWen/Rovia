@@ -8,6 +8,7 @@ using Rovia.Backends;
 using Rovia.Backends.SingBox;
 using Rovia.Backends.Xray;
 using Rovia.Config.Parsing;
+using Rovia.Config.Export;
 using Rovia.Config.Storage;
 using Rovia.Config.Subscriptions;
 using Rovia.Core.Engine;
@@ -64,6 +65,7 @@ internal static class RoviaCli
                 "history"      => ShowHistory(dataDirectory),
                 "export-diagnostics" => ExportDiagnostics(args, dataDirectory),
                 "check-config" => CheckConfig(args, repository, dataDirectory),
+                "xhttp-profiles" => GenerateXhttpProfiles(args, repository),
                 _              => Unknown(args[0])
             };
         }
@@ -533,6 +535,15 @@ internal static class RoviaCli
         return 0;
     }
 
+    private static int GenerateXhttpProfiles(string[] args, JsonNodeRepository repository)
+    {
+        RequireArguments(args, 2, "xhttp-profiles requires a node identifier.");
+        ProxyNode node = repository.Get(args[1]) ?? throw new InvalidOperationException($"Node '{args[1]}' was not found.");
+        foreach ((string name, string link) in new XhttpProfileGenerator().Generate(node))
+            Console.WriteLine($"{name}: {link}");
+        return 0;
+    }
+
     private static int ExportDiagnostics(string[] args, string dataDirectory)
     {
         string destination = args.Length >= 2
@@ -606,6 +617,7 @@ internal static class RoviaCli
           rovia probe
           rovia rank
           rovia check-config <node-id>
+          rovia xhttp-profiles <node-id>
           rovia connect <node-id>
           rovia connect-auto
           rovia status

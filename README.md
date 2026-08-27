@@ -48,6 +48,7 @@ The dependency direction is intentionally constrained:
 - Safe Windows system proxy activation with previous-setting restoration.
 - Optional transparent TUN capture for applications that ignore system proxies.
 - A simple Avalonia desktop control panel shared with the same Core and runtime.
+- Automatic Xray selection for VLESS XHTTP, including bounded XMUX reuse profiles for long streams.
 
 ## Build and test
 
@@ -155,6 +156,12 @@ manual by design so periodic route monitoring does not consume significant data.
 whether a switch was caused by failure or by a score improvement large enough to
 cross the configured hysteresis threshold. The same latest switch reason appears
 in Desktop runtime status.
+
+VLESS XHTTP nodes use a verified official Xray binary because sing-box does not
+support that transport. Run `rovia xhttp-profiles <node-id>` to generate Default,
+LongStream, and explicit WS fallback links. See [docs/XHTTP-STABILITY.md](docs/XHTTP-STABILITY.md)
+for parameter boundaries, validation, rollback, and the Worker-side work that must
+remain in the EdgeTunnel repository.
 
 Rovia manages its own sing-box executable under `%LOCALAPPDATA%\Rovia\bin` on
 Windows. If the binary is missing, the next connection downloads the latest
