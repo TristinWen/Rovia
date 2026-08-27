@@ -26,7 +26,9 @@ public static class RuntimePreflight
         try
         {
             using System.Diagnostics.Process process = System.Diagnostics.Process.GetProcessById(processId);
-            if (!string.Equals(process.ProcessName, "sing-box", StringComparison.OrdinalIgnoreCase))
+            bool recognized = process.ProcessName.Equals("sing-box", StringComparison.OrdinalIgnoreCase)
+                              || process.ProcessName.Equals("xray", StringComparison.OrdinalIgnoreCase);
+            if (!recognized)
                 return false;
             process.Kill(true);
             process.WaitForExit(5000);

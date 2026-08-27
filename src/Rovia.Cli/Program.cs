@@ -329,15 +329,17 @@ internal static class RoviaCli
         Console.CancelKeyPress += (_, eventArgs) => { eventArgs.Cancel = true; exit.Cancel(); };
         RuntimeState State() => new()
         {
-            IsRunning = !exit.IsCancellationRequested, ProcessId = Environment.ProcessId, BackendProcessId = status.ProcessId, NodeId = engine.CurrentNode?.Id,
+            IsRunning = !exit.IsCancellationRequested, ProcessId = Environment.ProcessId, BackendProcessId = status.ProcessId,
+            BackendName = status.BackendName, NodeId = engine.CurrentNode?.Id,
             NodeName = engine.CurrentNode is null ? null : DisplayName(engine.CurrentNode), LocalEndpoint = status.LocalEndpoint?.ToString(),
             FailoverState = engine.FailoverState, StartedAt = startedAt, UpdatedAt = DateTimeOffset.UtcNow,
             LastMessage = performance?.Message ?? runtimeMessage,
             ProxyLatencyMs = performance?.LatencyMs, DownloadMbps = performance?.DownloadMbps, PerformanceAt = performance?.MeasuredAt,
             LiveLogs = liveLogs.Snapshot()
         };
-        engine.RouteChanged += (_, eventArgs) =>
+        engine.RouteChanged += async (_, eventArgs) =>
         {
+            status = await engine.GetStatusAsync();
             if (engine.LastSelectionDecision?.Reason is not { } reason)
                 return;
             runtimeMessage = reason;

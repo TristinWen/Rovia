@@ -84,7 +84,7 @@ rovia export-diagnostics [output.zip]
 rovia disconnect
 ```
 
-`connect` starts a detached runtime host that owns sing-box and exposes a mixed HTTP/SOCKS proxy at
+`connect` starts a detached runtime host that owns the compatible proxy core and exposes a local proxy at
 `127.0.0.1:2080` by default. It verifies real HTTP egress before changing the
 Windows system proxy. The runtime remains active after the invoking CLI or Desktop
 window exits. Use `disconnect` for an orderly shutdown;
@@ -199,7 +199,7 @@ host is not yet registered as an operating-system service or startup task.
 
 TUN configuration is opt-in and validated against sing-box, but requires an
 elevated Windows process for real traffic capture. Mobile platform VPN bridges,
-Xray backend support, Hysteria2/TUIC parsing, and subscription scheduling remain
+Hysteria2/TUIC parsing and subscription scheduling remain
 future milestones.
 
 Credentials are encrypted in the local node file with Windows DPAPI for the

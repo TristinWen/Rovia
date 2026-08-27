@@ -81,7 +81,7 @@ public sealed class XrayBackend(
     {
         bool running         = _process is { HasExited: false };
         BackendStatus status = new(running, running ? _process!.Id : null, _nodeId,
-            running ? new Uri($"http://{options.ListenAddress}:{options.ListenPort}") : null, _lastError);
+            running ? new Uri($"http://{options.ListenAddress}:{options.ListenPort}") : null, _lastError, "Xray");
         return Task.FromResult(status);
     }
 

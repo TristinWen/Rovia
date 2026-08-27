@@ -69,7 +69,7 @@ public sealed class SingBoxBackend(SingBoxOptions options, SingBoxConfigBuilder 
     {
         bool running = _process is { HasExited: false };
         BackendStatus status = new(running, running ? _process!.Id : null, _nodeId,
-            running ? new Uri($"socks5://{options.ListenAddress}:{options.ListenPort}") : null, _lastError);
+            running ? new Uri($"socks5://{options.ListenAddress}:{options.ListenPort}") : null, _lastError, "sing-box");
         return Task.FromResult(status);
     }
 

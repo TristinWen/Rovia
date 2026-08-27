@@ -9,6 +9,7 @@ public sealed record RuntimeState
     public bool              IsRunning       { get; init; }
     public int               ProcessId       { get; init; }
     public int?              BackendProcessId { get; init; }
+    public string?           BackendName      { get; init; }
     public string?           NodeId          { get; init; }
     public string?           NodeName        { get; init; }
     public string?           LocalEndpoint   { get; init; }

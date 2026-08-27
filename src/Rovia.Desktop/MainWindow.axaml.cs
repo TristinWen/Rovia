@@ -144,7 +144,7 @@ public partial class MainWindow : Window
             _runtimeProcess = process;
             _ = Task.Run(() => ReadRuntimeOutputStreamAsync(process.StandardOutput, "INFO"));
             _ = Task.Run(() => ReadRuntimeOutputStreamAsync(process.StandardError, "ERROR"));
-            SetMessage("Preparing sing-box and verifying proxy egress...");
+            SetMessage("Preparing the proxy core and verifying proxy egress...");
             await WaitForRuntimeAsync(process);
             await RefreshStatusAsync();
         }
@@ -328,7 +328,8 @@ public partial class MainWindow : Window
         if (state is { IsRunning: true })
         {
             StatusDot.Fill       = ConnectedBrush;
-            StatusText.Text       = $"Connected · {state.NodeName} · {state.LocalEndpoint}";
+            string backend       = string.IsNullOrWhiteSpace(state.BackendName) ? string.Empty : $" · {state.BackendName}";
+            StatusText.Text       = $"Connected · {state.NodeName}{backend} · {state.LocalEndpoint}";
             StatusText.Foreground = ConnectedBrush;
             AppendLog("INFO", $"Connected to {state.NodeName} via {state.LocalEndpoint}.");
         }
@@ -370,7 +371,7 @@ public partial class MainWindow : Window
             await Task.Delay(500);
         }
         AppendLog("ERROR", "Runtime did not become ready within two minutes.");
-        throw new TimeoutException("Rovia did not finish preparing sing-box within two minutes.");
+        throw new TimeoutException("Rovia did not finish preparing the proxy core within two minutes.");
     }
 
     private async Task ReadRuntimeOutputStreamAsync(StreamReader reader, string level)
