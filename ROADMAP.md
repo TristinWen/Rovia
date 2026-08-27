@@ -16,7 +16,7 @@ Desktop / CLI / future mobile clients
                   |
       backend and platform abstractions
           |                    |
-      sing-box          platform networking
+  sing-box / Xray       platform networking
 ```
 
 Core owns models, health evidence, scoring, selection, hysteresis, and failover.
@@ -38,7 +38,7 @@ Implemented and validated:
   network address or availability changes.
 - Atomic JSON node persistence with current-user Windows DPAPI credential encryption
   and automatic plaintext migration.
-- Deterministic sing-box configuration and managed binary provisioning.
+- Deterministic sing-box and Xray configuration with verified managed binary provisioning.
 - TCP health samples, rolling success/failure metrics, stability-first scoring,
   deterministic ranking, hysteresis, and explicit failover state.
 - Real proxy egress checks, multi-target diagnostics, warmed median proxy latency,
@@ -52,13 +52,16 @@ Implemented and validated:
 - Standards-compliant sing-box HTTP transport mapping with host lists, request
   paths and methods, bounded HTTP/2 health checks, and rejection of unknown types.
 - Cross-process runtime status, speed-test, diagnostics, and clean disconnect.
+- Versioned Desktop/runtime compatibility checks and incremental, memory-only live
+  backend logs for both sing-box and Xray.
 - Detached runtime ownership independent of the invoking CLI/Desktop, repeated
   backend-exit supervision, and scheduled due-provider refresh.
 - Bounded atomic health history and route decisions explaining emergency failover,
   hysteresis holds, score improvements, and active switching thresholds.
 - Windows system-proxy snapshot and restoration.
 - Startup preflight for occupied proxy ports plus interrupted-session recovery for
-  orphaned sing-box processes and pending system-proxy snapshots.
+  orphaned proxy-core processes, generated credential configs, and pending
+  system-proxy snapshots.
 - Bounded structured JSONL runtime logs and redacted support ZIP export from CLI
   or Desktop.
 - Opt-in sing-box TUN configuration with strict automatic routes.
@@ -76,7 +79,7 @@ Last known validation baseline:
 dotnet build Rovia.sln --configuration Release
 dotnet test Rovia.sln --configuration Release --no-build
 
-61 tests passed (including opt-in installed sing-box configuration validation)
+75 tests passed (including opt-in installed sing-box configuration validation)
 0 build warnings
 0 build errors
 ```
@@ -163,12 +166,13 @@ Definition of done:
 - Offline routes fail over automatically; small score changes do not cause flapping.
 - Direct/proxy/block and DNS behavior are covered by deterministic configuration tests.
 
-### P2 — Xray backend
+### P2 — Xray backend (in progress)
 
 Goal: prove backend independence and support Xray-specific users.
 
-- Implement `XrayConfigBuilder`, `XrayBackend`, and verified binary provisioning.
-- Publish accurate `BackendCapabilities` and reject unsupported node features early.
+- `XrayConfigBuilder`, `XrayBackend`, verified binary provisioning, and automatic
+  VLESS XHTTP routing are implemented.
+- Backend capabilities and unsupported XHTTP/TUN combinations are validated early.
 - Add same-node sing-box/Xray benchmarks for latency, throughput, memory, and CPU.
 - Select a backend explicitly; do not claim one is faster without measurements.
 
@@ -228,7 +232,8 @@ native service/extension must continue when the Unity UI process is suspended.
 - Subscription providers, manual refresh, and background due refresh are persisted.
 - Routing/DNS policy is configured through `routing.json`; Desktop does not yet
   provide a visual policy editor.
-- Only sing-box is implemented as a backend.
+- sing-box handles the common transports and Xray handles VLESS XHTTP; equivalent
+  same-node performance benchmarks have not been completed.
 - Hysteria2 and TUIC enum values exist but their parsers/adapters do not.
 - Credentials are protected with current-user Windows DPAPI. Non-credential node
   metadata remains readable JSON, and explicit file ACL hardening remains planned.

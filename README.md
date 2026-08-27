@@ -2,7 +2,7 @@
 
 Rovia is a reusable intelligent proxy routing engine that monitors, scores,
 selects, and fails over between proxy routes while delegating protocol transport
-to existing backends such as sing-box.
+to existing backends such as sing-box and Xray.
 
 See [ROADMAP.md](ROADMAP.md) for architecture constraints, current limitations,
 new-machine setup, prioritized milestones, and handoff requirements.
@@ -22,7 +22,7 @@ Share link parser
 Backend adapter
         |
         v
-     sing-box
+ sing-box / Xray
 ```
 
 The dependency direction is intentionally constrained:
@@ -49,6 +49,10 @@ The dependency direction is intentionally constrained:
 - Optional transparent TUN capture for applications that ignore system proxies.
 - A simple Avalonia desktop control panel shared with the same Core and runtime.
 - Automatic Xray selection for VLESS XHTTP, including bounded XMUX reuse profiles for long streams.
+- Memory-only live backend traffic logs, selected-connection deletion, and explicit
+  display of the active proxy core in Desktop.
+- Desktop/runtime protocol validation that prevents stale packaged CLI binaries
+  from starting an incompatible connection.
 
 ## Build and test
 
@@ -203,8 +207,10 @@ Hysteria2/TUIC parsing and subscription scheduling remain
 future milestones.
 
 Credentials are encrypted in the local node file with Windows DPAPI for the
-current user. Rovia never includes them in node display strings, normal CLI output,
-scoring diagnostics, or support ZIP exports.
+current user. Generated proxy-core configs are removed after disconnect and during
+interrupted-session recovery. Rovia never includes credentials in node display
+strings, normal CLI output, scoring diagnostics, live-log persistence, or support
+ZIP exports.
 
 ## Non-goals
 
