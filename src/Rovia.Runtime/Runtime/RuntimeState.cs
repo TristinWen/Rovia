@@ -1,4 +1,5 @@
 using Rovia.Core.Models;
+using Rovia.Runtime.Diagnostics;
 
 namespace Rovia.Runtime.Runtime;
 
@@ -18,4 +19,5 @@ public sealed record RuntimeState
     public double?           ProxyLatencyMs  { get; init; }
     public double?           DownloadMbps    { get; init; }
     public DateTimeOffset?   PerformanceAt   { get; init; }
+    public IReadOnlyList<RuntimeLiveLogEntry> LiveLogs { get; init; } = [];
 }

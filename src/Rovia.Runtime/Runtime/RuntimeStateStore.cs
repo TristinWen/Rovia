@@ -22,7 +22,7 @@ public sealed class RuntimeStateStore(string path)
         string fullPath = Path.GetFullPath(path);
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
         string temporaryPath = $"{fullPath}.{Guid.NewGuid():N}.tmp";
-        File.WriteAllText(temporaryPath, JsonSerializer.Serialize(state, JsonOptions));
+        File.WriteAllText(temporaryPath, JsonSerializer.Serialize(state with { LiveLogs = [] }, JsonOptions));
         File.Move(temporaryPath, fullPath, true);
     }
 

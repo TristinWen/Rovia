@@ -5,7 +5,7 @@ using Rovia.Core.Models;
 namespace Rovia.Backends.SingBox;
 
 /// <summary>Manages a sing-box child process and its generated runtime configuration.</summary>
-public sealed class SingBoxBackend(SingBoxOptions options, SingBoxConfigBuilder configBuilder) : IProxyBackend
+public sealed class SingBoxBackend(SingBoxOptions options, SingBoxConfigBuilder configBuilder, Action<string, string>? liveLog = null) : IProxyBackend
 {
     private Process? _process;
     private string? _nodeId;
@@ -36,7 +36,8 @@ public sealed class SingBoxBackend(SingBoxOptions options, SingBoxConfigBuilder 
         startInfo.ArgumentList.Add(configPath);
 
         _process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-        _process.ErrorDataReceived += (_, eventArgs) => { if (!string.IsNullOrWhiteSpace(eventArgs.Data)) _lastError = eventArgs.Data; };
+        _process.ErrorDataReceived += (_, eventArgs) => Capture("WARN", eventArgs.Data);
+        _process.OutputDataReceived += (_, eventArgs) => Capture("INFO", eventArgs.Data);
         if (!_process.Start())
             throw new InvalidOperationException("Unable to start sing-box.");
         _process.BeginErrorReadLine();
@@ -73,4 +74,12 @@ public sealed class SingBoxBackend(SingBoxOptions options, SingBoxConfigBuilder 
     }
 
     public async ValueTask DisposeAsync() => await StopAsync();
+
+    private void Capture(string level, string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+        _lastError = level == "WARN" ? message : _lastError;
+        liveLog?.Invoke(level, message);
+    }
 }

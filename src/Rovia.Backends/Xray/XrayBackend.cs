@@ -8,7 +8,8 @@ namespace Rovia.Backends.Xray;
 public sealed class XrayBackend(
     XrayOptions options,
     XrayConfigBuilder configBuilder,
-    BackendReadinessProbe? readinessProbe = null) : IProxyBackend
+    BackendReadinessProbe? readinessProbe = null,
+    Action<string, string>? liveLog = null) : IProxyBackend
 {
     private readonly BackendReadinessProbe _readinessProbe = readinessProbe ?? new();
     private Process? _process;
@@ -37,7 +38,8 @@ public sealed class XrayBackend(
         startInfo.ArgumentList.Add("-c");
         startInfo.ArgumentList.Add(configPath);
         _process = new() { StartInfo = startInfo, EnableRaisingEvents = true };
-        _process.ErrorDataReceived += (_, eventArgs) => { if (!string.IsNullOrWhiteSpace(eventArgs.Data)) _lastError = eventArgs.Data; };
+        _process.ErrorDataReceived += (_, eventArgs) => Capture("WARN", eventArgs.Data);
+        _process.OutputDataReceived += (_, eventArgs) => Capture("INFO", eventArgs.Data);
         if (!_process.Start())
             throw new InvalidOperationException("Unable to start Xray.");
         _process.BeginErrorReadLine();
@@ -84,4 +86,12 @@ public sealed class XrayBackend(
     }
 
     public async ValueTask DisposeAsync() => await StopAsync();
+
+    private void Capture(string level, string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+        _lastError = level == "WARN" ? message : _lastError;
+        liveLog?.Invoke(level, message);
+    }
 }

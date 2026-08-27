@@ -6,7 +6,11 @@ using Rovia.Core.Models;
 namespace Rovia.Backends;
 
 /// <summary>Selects the compatible transport backend without changing existing node links.</summary>
-public sealed class ProxyBackendRouter(string dataDirectory, SingBoxOptions singBoxOptions, XrayOptions xrayOptions) : IProxyBackend
+public sealed class ProxyBackendRouter(
+    string dataDirectory,
+    SingBoxOptions singBoxOptions,
+    XrayOptions xrayOptions,
+    Action<string, string>? liveLog = null) : IProxyBackend
 {
     private IProxyBackend? _active;
 
@@ -48,9 +52,9 @@ public sealed class ProxyBackendRouter(string dataDirectory, SingBoxOptions sing
             if (xrayOptions.ListenPort != singBoxOptions.ListenPort)
                 throw new InvalidOperationException("Xray and sing-box must expose the same local proxy port.");
             string executable = await new XrayProvisioner().EnsureAsync(dataDirectory, cancellationToken);
-            return new XrayBackend(xrayOptions with { ExecutablePath = executable }, new XrayConfigBuilder());
+            return new XrayBackend(xrayOptions with { ExecutablePath = executable }, new XrayConfigBuilder(), liveLog: liveLog);
         }
         string singBox = await new SingBoxProvisioner().EnsureAsync(dataDirectory, cancellationToken);
-        return new SingBoxBackend(singBoxOptions with { ExecutablePath = singBox }, new SingBoxConfigBuilder());
+        return new SingBoxBackend(singBoxOptions with { ExecutablePath = singBox }, new SingBoxConfigBuilder(), liveLog);
     }
 }

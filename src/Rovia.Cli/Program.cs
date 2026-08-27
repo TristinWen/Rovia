@@ -241,6 +241,7 @@ internal static class RoviaCli
         if (!ownsRuntime)
             throw new InvalidOperationException("Another Rovia runtime is already connected or connecting.");
         RuntimeLog log = new(Path.Combine(dataDirectory, "logs"));
+        RuntimeLiveLogBuffer liveLogs = new();
         RecoverInterruptedRuntime(dataDirectory);
         SingBoxOptions requestedOptions = CreateOptions(dataDirectory);
         NetworkEnvironmentSnapshot environment = NetworkEnvironmentInspector.Capture();
@@ -250,7 +251,7 @@ internal static class RoviaCli
                 "Cloudflare WARP is active. Use system-proxy mode so Rovia can share the WARP path without creating a conflicting second TUN interface.");
         }
         RuntimePreflight.EnsurePortAvailable(requestedOptions.ListenPort);
-        await using AdaptiveRouteEngine engine = CreateEngine(repository, dataDirectory);
+        await using AdaptiveRouteEngine engine = CreateEngine(repository, dataDirectory, liveLogs);
         IReadOnlyList<ProxyNode> candidates;
         if (automatic)
         {
@@ -332,7 +333,8 @@ internal static class RoviaCli
             NodeName = engine.CurrentNode is null ? null : DisplayName(engine.CurrentNode), LocalEndpoint = status.LocalEndpoint?.ToString(),
             FailoverState = engine.FailoverState, StartedAt = startedAt, UpdatedAt = DateTimeOffset.UtcNow,
             LastMessage = performance?.Message ?? runtimeMessage,
-            ProxyLatencyMs = performance?.LatencyMs, DownloadMbps = performance?.DownloadMbps, PerformanceAt = performance?.MeasuredAt
+            ProxyLatencyMs = performance?.LatencyMs, DownloadMbps = performance?.DownloadMbps, PerformanceAt = performance?.MeasuredAt,
+            LiveLogs = liveLogs.Snapshot()
         };
         engine.RouteChanged += (_, eventArgs) =>
         {
@@ -568,11 +570,12 @@ internal static class RoviaCli
         }
     }
 
-    private static AdaptiveRouteEngine CreateEngine(JsonNodeRepository repository, string dataDirectory)
+    private static AdaptiveRouteEngine CreateEngine(JsonNodeRepository repository, string dataDirectory, RuntimeLiveLogBuffer? liveLogs = null)
     {
         SingBoxOptions options = CreateOptions(dataDirectory);
         return new(repository, new HealthMonitor(new TcpNodeProbe()), new RouteScorer(), new RouteSelector(),
-            new FailoverEngine(), new ProxyBackendRouter(dataDirectory, options, CreateXrayOptions(dataDirectory)), new RoutingPolicy());
+            new FailoverEngine(), new ProxyBackendRouter(dataDirectory, options, CreateXrayOptions(dataDirectory),
+                liveLogs is null ? null : liveLogs.Add), new RoutingPolicy());
     }
 
     private static SingBoxOptions CreateOptions(string dataDirectory, string? singBoxPath = null)

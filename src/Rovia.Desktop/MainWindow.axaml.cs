@@ -4,11 +4,13 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Rovia.Config.Parsing;
 using Rovia.Config.Storage;
 using Rovia.Config.Subscriptions;
 using Rovia.Core.Models;
 using Rovia.Platform.Windows.Security;
+using Rovia.Runtime.Diagnostics;
 using Rovia.Runtime.Runtime;
 using System.Text.Json;
 
@@ -27,6 +29,8 @@ public partial class MainWindow : Window
     private bool _speedTestRunning;
     private string _logLevel = "info";
     private Process? _runtimeProcess;
+    private readonly DispatcherTimer _liveLogTimer;
+    private long _lastLiveLogSequence;
 
     public MainWindow()
     {
@@ -40,6 +44,9 @@ public partial class MainWindow : Window
         LoadSettings();
         ApplyLogLevelSelection();
         LogLevelComboBox.SelectionChanged += LogLevelChanged;
+        _liveLogTimer = new(TimeSpan.FromSeconds(1), DispatcherPriority.Background, async (_, _) => await RefreshLiveLogsAsync());
+        Opened        += (_, _) => _liveLogTimer.Start();
+        Closed        += (_, _) => _liveLogTimer.Stop();
     }
 
     private async void ImportLinkClicked(object? sender, RoutedEventArgs eventArgs)
@@ -121,6 +128,7 @@ public partial class MainWindow : Window
             if (state is { IsRunning: true })
                 throw new InvalidOperationException("Rovia is already connected.");
             string cliPath = FindCliPath();
+            _lastLiveLogSequence = 0;
             AppendLog("INFO", $"Starting runtime: {cliPath} {command}");
             ProcessStartInfo startInfo = new(cliPath, command)
             {
@@ -284,8 +292,35 @@ public partial class MainWindow : Window
             catch (IOException) { }
         }
         UpdateStatusIndicator(state);
+        AppendLiveLogs(state);
         SetMessage(state?.LastMessage ?? "Ready.");
         ShowPerformance(state);
+    }
+
+    private async Task RefreshLiveLogsAsync()
+    {
+        RuntimeState? state = new RuntimeStateStore(Path.Combine(_dataDirectory, "runtime-state.json")).Read();
+        if (state is not { IsRunning: true })
+            return;
+        try
+        {
+            state = await new RuntimeControlClient($"rovia-{Environment.UserName}").SendAsync("status");
+            AppendLiveLogs(state);
+        }
+        catch (Exception exception) when (exception is IOException or OperationCanceledException or TimeoutException)
+        {
+        }
+    }
+
+    private void AppendLiveLogs(RuntimeState? state)
+    {
+        if (state is null)
+            return;
+        foreach (RuntimeLiveLogEntry entry in state.LiveLogs.Where(entry => entry.Sequence > _lastLiveLogSequence))
+        {
+            AppendLog(entry.Level, entry.Message);
+            _lastLiveLogSequence = entry.Sequence;
+        }
     }
 
     private void UpdateStatusIndicator(RuntimeState? state)
