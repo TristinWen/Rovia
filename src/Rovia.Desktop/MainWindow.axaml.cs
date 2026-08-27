@@ -183,6 +183,18 @@ public partial class MainWindow : Window
         await DeleteSelectedAsync();
     }
 
+    private void NodeSelectionChanged(object? sender, SelectionChangedEventArgs eventArgs)
+    {
+        if (NodeList.SelectedItem is NodeItem selected)
+        {
+            SelectedNodeNameText.Text     = selected.Name;
+            SelectedNodeEndpointText.Text = $"{selected.Protocol} · {selected.Endpoint}";
+            return;
+        }
+        SelectedNodeNameText.Text     = "No connection selected";
+        SelectedNodeEndpointText.Text = "Choose one from the library";
+    }
+
     private async Task DeleteSelectedAsync()
     {
         if (NodeList.SelectedItem is not NodeItem selected)
@@ -465,9 +477,16 @@ public partial class MainWindow : Window
 
     private void ReloadNodes()
     {
+        string? selectedId = (NodeList.SelectedItem as NodeItem)?.Id;
         _nodes.Clear();
         foreach (ProxyNode node in _repository.GetAll())
-            _nodes.Add(new(node.Id, DisplayName(node), $"{node.Host}:{node.Port}", node.Protocol.ToString(), node.Host, node.Port));
+        {
+            string protocol = node.Protocol.ToString();
+            _nodes.Add(new(node.Id, DisplayName(node), $"{node.Host}:{node.Port}", protocol,
+                protocol[..1].ToUpperInvariant(), node.Host, node.Port));
+        }
+        NodeCountText.Text = $"{_nodes.Count} saved route{(_nodes.Count == 1 ? string.Empty : "s")}";
+        NodeList.SelectedItem = _nodes.FirstOrDefault(item => item.Id == selectedId);
         AppendLog("INFO", $"Loaded {_nodes.Count} node(s).");
     }
 
@@ -509,7 +528,7 @@ public partial class MainWindow : Window
 
     private static string DisplayName(ProxyNode node) => string.IsNullOrWhiteSpace(node.Name) ? node.Host : node.Name;
 
-    private sealed record NodeItem(string Id, string Name, string Endpoint, string Protocol, string Host, int Port);
+    private sealed record NodeItem(string Id, string Name, string Endpoint, string Protocol, string ProtocolInitial, string Host, int Port);
 
     private sealed record LogEntry(string Time, string Level, string Message);
 }

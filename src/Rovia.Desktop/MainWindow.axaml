@@ -1,115 +1,153 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="920" d:DesignHeight="620"
-        x:Class="Rovia.Desktop.MainWindow"
-        Width="1100" Height="760" MinWidth="820" MinHeight="580"
-        Title="Rovia">
-  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="24">
-    <Menu Grid.Row="0">
-      <MenuItem Header="_File">
-        <MenuItem Header="_Import link..." Click="ImportLinkClicked" />
-        <MenuItem Header="Import _subscription..." Click="ImportSubscriptionMenuItemClicked" />
-        <Separator />
-        <MenuItem Header="_Delete selected connection..." Click="DeleteClicked" InputGesture="Delete" />
-        <Separator />
-        <MenuItem Header="_Clear log" Click="ClearLogClicked" />
-        <Separator />
-        <MenuItem Header="E_xit" Click="ExitClicked" />
-      </MenuItem>
-    </Menu>
-
-    <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="0,16,0,20">
-      <StackPanel Grid.Column="0" Spacing="4">
-        <TextBlock Text="Rovia" FontSize="30" FontWeight="SemiBold" />
-        <TextBlock Text="Adaptive proxy routing" Opacity="0.65" />
-      </StackPanel>
-      <Border Grid.Column="1" Background="#151D2A" CornerRadius="6" Padding="12,8" VerticalAlignment="Center" Margin="24,0,0,0">
-        <TextBlock x:Name="MessageText" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
-      </Border>
-    </Grid>
-
-    <Border Grid.Row="2" Background="#151D2A" CornerRadius="10" Padding="16" Margin="0,0,0,16">
-      <Grid ColumnDefinitions="*,180,140,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
-        <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Spacing="8">
-          <Ellipse x:Name="StatusDot" Width="12" Height="12" Fill="#EF4444" />
-          <TextBlock Text="Runtime status" Opacity="0.65" />
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1280" d:DesignHeight="820" x:Class="Rovia.Desktop.MainWindow"
+        Width="1280" Height="820" MinWidth="980" MinHeight="650" Icon="avares://Rovia.Desktop/Assets/rovia.ico"
+        Title="Rovia · Adaptive routing">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <Border Grid.Row="0" Background="#0C1220" BorderBrush="#243047" BorderThickness="0,0,0,1" Padding="24,14">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <Image Source="avares://Rovia.Desktop/Assets/rovia.png" Width="38" Height="38" />
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="ROVIA" FontSize="20" FontWeight="Bold" LetterSpacing="2" />
+            <TextBlock Text="Adaptive route control" Classes="muted" FontSize="11" />
+          </StackPanel>
         </StackPanel>
-        <TextBlock x:Name="StatusText" Grid.Row="1" Grid.Column="0" Text="Disconnected" FontSize="18" FontWeight="SemiBold" Foreground="#EF4444" />
-        <TextBlock x:Name="PerformanceText" Grid.Row="2" Grid.Column="0" Text="Latency — · Download —" Margin="0,6,0,0" Opacity="0.75" />
-        <TextBlock Grid.Row="3" Grid.Column="0" Text="Local proxy 127.0.0.1:2080" Margin="0,4,0,0" Opacity="0.55" FontSize="12" />
-        <StackPanel Grid.RowSpan="4" Grid.Column="1" Margin="16,0" Spacing="4">
-          <TextBlock Text="Traffic mode" Opacity="0.65" />
-          <ComboBox x:Name="ModeComboBox" SelectedIndex="0">
-            <ComboBoxItem Content="System proxy" Tag="system-proxy" />
-            <ComboBoxItem Content="TUN (administrator)" Tag="tun" />
-          </ComboBox>
-        </StackPanel>
-        <StackPanel Grid.RowSpan="4" Grid.Column="2" Margin="16,0" Spacing="4">
-          <TextBlock Text="Log level" Opacity="0.65" />
-          <ComboBox x:Name="LogLevelComboBox" SelectedIndex="2">
-            <ComboBoxItem Content="Trace" Tag="trace" />
-            <ComboBoxItem Content="Debug" Tag="debug" />
-            <ComboBoxItem Content="Info" Tag="info" />
-            <ComboBoxItem Content="Warn" Tag="warn" />
-            <ComboBoxItem Content="Error" Tag="error" />
-          </ComboBox>
-        </StackPanel>
-        <StackPanel Grid.RowSpan="4" Grid.Column="3" Spacing="8" VerticalAlignment="Center">
-          <Button Content="Refresh" Click="RefreshClicked" />
-          <Button Content="Speed test" Click="SpeedTestClicked" />
+        <Border Grid.Column="1" Background="#111827" CornerRadius="8" Padding="14,9" Margin="28,0">
+          <TextBlock x:Name="MessageText" Text="Ready." TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+        </Border>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+          <Button Content="Import link" Click="ImportLinkClicked" />
+          <Button Content="Add subscription" Click="ImportSubscriptionMenuItemClicked" />
         </StackPanel>
       </Grid>
     </Border>
 
-    <Grid Grid.Row="3" ColumnDefinitions="300,*" Margin="0,0,0,16">
-      <Border Grid.Column="0" BorderBrush="#334155" BorderThickness="1" CornerRadius="8">
-        <ListBox x:Name="NodeList" KeyDown="NodeListKeyDown">
-          <ListBox.ContextMenu>
-            <ContextMenu>
-              <MenuItem Header="Delete selected connection..." Click="DeleteClicked" />
-            </ContextMenu>
-          </ListBox.ContextMenu>
-          <ListBox.ItemTemplate>
-            <DataTemplate>
-              <Grid ColumnDefinitions="*,Auto" Margin="8">
-                <StackPanel>
-                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding Endpoint}" Opacity="0.6" FontSize="12" />
+    <Grid Grid.Row="1" ColumnDefinitions="330,*,310" Margin="20" ColumnSpacing="16">
+      <Border Grid.Column="0" Classes="card">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <Grid ColumnDefinitions="*,Auto" Margin="18,16,18,10">
+            <StackPanel>
+              <TextBlock Text="CONNECTIONS" Classes="eyebrow" />
+              <TextBlock x:Name="NodeCountText" Text="Saved routes" FontSize="18" FontWeight="SemiBold" Margin="0,3,0,0" />
+            </StackPanel>
+            <Button Grid.Column="1" Content="↻" Click="RefreshClicked" ToolTip.Tip="Refresh status" />
+          </Grid>
+          <ListBox Grid.Row="1" x:Name="NodeList" KeyDown="NodeListKeyDown" SelectionChanged="NodeSelectionChanged"
+                   Background="Transparent" BorderThickness="0" Margin="8,0">
+            <ListBox.ContextMenu><ContextMenu>
+              <MenuItem Header="Connect selected" Click="ConnectSelectedClicked" />
+              <MenuItem Header="Diagnose" Click="DiagnoseClicked" />
+              <Separator /><MenuItem Header="Delete connection..." Click="DeleteClicked" />
+            </ContextMenu></ListBox.ContextMenu>
+            <ListBox.ItemTemplate><DataTemplate>
+              <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,9" ColumnSpacing="10">
+                <Border Width="34" Height="34" CornerRadius="9" Background="#172554">
+                  <TextBlock Text="{Binding ProtocolInitial}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#93C5FD" FontWeight="Bold" />
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Endpoint}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
-                <TextBlock Grid.Column="1" Text="{Binding Protocol}" VerticalAlignment="Center" Opacity="0.7" />
+                <Border Grid.Column="2" Background="#192235" CornerRadius="10" Padding="8,3" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Protocol}" Classes="muted" FontSize="10" />
+                </Border>
               </Grid>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
-      </Border>
-      <Border Grid.Column="1" Margin="16,0,0,0" BorderBrush="#334155" BorderThickness="1" CornerRadius="8">
-        <Grid RowDefinitions="Auto,*">
-          <TextBlock Grid.Row="0" Text="Connection log" FontWeight="SemiBold" Margin="12,8,12,4" />
-          <ListBox Grid.Row="1" x:Name="LogList" ScrollViewer.HorizontalScrollBarVisibility="Auto">
-            <ListBox.ItemTemplate>
-              <DataTemplate>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Text="{Binding Time}" Opacity="0.6" FontSize="12" />
-                  <TextBlock Text="{Binding Level}" FontWeight="SemiBold" FontSize="12" />
-                  <TextBlock Text="{Binding Message}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                </StackPanel>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
+            </DataTemplate></ListBox.ItemTemplate>
           </ListBox>
+          <StackPanel Grid.Row="2" Margin="16" Spacing="8">
+            <Button Content="Connect selected" Classes="primary" Click="ConnectSelectedClicked" HorizontalAlignment="Stretch" />
+            <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+              <Button Content="Diagnose" Click="DiagnoseClicked" HorizontalAlignment="Stretch" />
+              <Button Grid.Column="1" Content="Delete" Classes="danger" Click="DeleteClicked" HorizontalAlignment="Stretch" />
+            </Grid>
+          </StackPanel>
         </Grid>
       </Border>
+
+      <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*" RowSpacing="16">
+        <Border Classes="card" Padding="22">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="7">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Ellipse x:Name="StatusDot" Width="10" Height="10" Fill="#EF4444" VerticalAlignment="Center" />
+                <TextBlock Text="CONNECTION STATUS" Classes="eyebrow" />
+              </StackPanel>
+              <TextBlock x:Name="StatusText" Text="Disconnected" FontSize="24" FontWeight="SemiBold" Foreground="#EF4444" />
+              <TextBlock x:Name="PerformanceText" Text="Proxy latency — · Download —" Classes="muted" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <Button Content="Best route" Classes="primary" Click="ConnectBestClicked" />
+              <Button Content="Disconnect" Click="DisconnectClicked" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,*,*" ColumnSpacing="12">
+          <Border Classes="card" Padding="16"><StackPanel Spacing="5">
+            <TextBlock Text="SELECTED ROUTE" Classes="eyebrow" />
+            <TextBlock x:Name="SelectedNodeNameText" Text="No connection selected" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="SelectedNodeEndpointText" Text="Choose one from the library" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
+          </StackPanel></Border>
+          <Border Grid.Column="1" Classes="card" Padding="16"><StackPanel Spacing="5">
+            <TextBlock Text="TRAFFIC MODE" Classes="eyebrow" />
+            <ComboBox x:Name="ModeComboBox" SelectedIndex="0">
+              <ComboBoxItem Content="System proxy" Tag="system-proxy" /><ComboBoxItem Content="TUN (administrator)" Tag="tun" />
+            </ComboBox>
+          </StackPanel></Border>
+          <Border Grid.Column="2" Classes="card" Padding="16"><StackPanel Spacing="5">
+            <TextBlock Text="LIVE LOG LEVEL" Classes="eyebrow" />
+            <ComboBox x:Name="LogLevelComboBox" SelectedIndex="2">
+              <ComboBoxItem Content="Trace" Tag="trace" /><ComboBoxItem Content="Debug" Tag="debug" />
+              <ComboBoxItem Content="Info" Tag="info" /><ComboBoxItem Content="Warn" Tag="warn" /><ComboBoxItem Content="Error" Tag="error" />
+            </ComboBox>
+          </StackPanel></Border>
+        </Grid>
+
+        <Border Grid.Row="2" Classes="card"><Grid RowDefinitions="Auto,*">
+          <Grid ColumnDefinitions="*,Auto" Margin="18,13">
+            <StackPanel><TextBlock Text="LIVE ACTIVITY" Classes="eyebrow" />
+              <TextBlock Text="Transient proxy-core events · never stored on disk" Classes="muted" FontSize="11" /></StackPanel>
+            <Button Grid.Column="1" Content="Clear" Click="ClearLogClicked" />
+          </Grid>
+          <ListBox Grid.Row="1" x:Name="LogList" BorderThickness="0" Background="#0B111D" ScrollViewer.HorizontalScrollBarVisibility="Auto">
+            <ListBox.ItemTemplate><DataTemplate>
+              <Grid ColumnDefinitions="62,58,*" Margin="12,5">
+                <TextBlock Text="{Binding Time}" Classes="muted" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
+                <TextBlock Grid.Column="1" Text="{Binding Level}" Foreground="#93C5FD" FontWeight="Bold" FontSize="11" />
+                <TextBlock Grid.Column="2" Text="{Binding Message}" FontFamily="Cascadia Mono, Consolas" FontSize="11" TextTrimming="CharacterEllipsis" />
+              </Grid>
+            </DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
+        </Grid></Border>
+      </Grid>
+
+      <StackPanel Grid.Column="2" Spacing="16">
+        <Border Classes="card" Padding="18"><StackPanel Spacing="12">
+          <TextBlock Text="QUICK ACTIONS" Classes="eyebrow" />
+          <Button Content="Test all routes" Click="ProbeClicked" HorizontalAlignment="Stretch" />
+          <Button Content="Run speed test" Click="SpeedTestClicked" HorizontalAlignment="Stretch" />
+          <Button Content="Export support ZIP" Click="ExportDiagnosticsClicked" HorizontalAlignment="Stretch" />
+        </StackPanel></Border>
+        <Border Classes="card" Padding="18"><StackPanel Spacing="8">
+          <TextBlock Text="LOCAL PROXY" Classes="eyebrow" /><TextBlock Text="127.0.0.1:2080" FontSize="18" FontWeight="SemiBold" />
+          <TextBlock Text="Applications using the Windows system proxy are routed automatically while connected." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel></Border>
+        <Border Classes="card" Padding="18"><StackPanel Spacing="8">
+          <TextBlock Text="HOW ROUTING WORKS" Classes="eyebrow" />
+          <TextBlock Text="Best route favors stability first, then latency. Small score changes do not interrupt an active connection." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel></Border>
+      </StackPanel>
     </Grid>
 
-    <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8">
-      <Button Content="Connect" Click="ConnectBestClicked" />
-      <Button Content="Connect selected" Click="ConnectSelectedClicked" ToolTip.Tip="Connect the node selected in the list" />
-      <Button Content="Disconnect" Click="DisconnectClicked" />
-      <Button Content="Delete selected" Click="DeleteClicked" />
-      <Button Content="Probe all" Click="ProbeClicked" />
-      <Button Content="Diagnose" Click="DiagnoseClicked" />
-      <Button Content="Export support ZIP" Click="ExportDiagnosticsClicked" />
-    </StackPanel>
+    <Border Grid.Row="2" Background="#0C1220" BorderBrush="#243047" BorderThickness="0,1,0,0" Padding="22,10">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="Credentials stay protected and the previous system proxy is restored on disconnect." Classes="muted" FontSize="11" VerticalAlignment="Center" />
+        <Menu Grid.Column="1" Background="Transparent"><MenuItem Header="More">
+          <MenuItem Header="Import link..." Click="ImportLinkClicked" /><MenuItem Header="Import subscription..." Click="ImportSubscriptionMenuItemClicked" />
+          <Separator /><MenuItem Header="Clear live activity" Click="ClearLogClicked" /><MenuItem Header="Exit" Click="ExitClicked" />
+        </MenuItem></Menu>
+      </Grid>
+    </Border>
   </Grid>
 </Window>
